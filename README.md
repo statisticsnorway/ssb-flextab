@@ -34,7 +34,9 @@ It makes tables in two dimensions, rows an columns
 
 ## Requirements
 
-- TODO
+- pandas
+- numpy
+- openpyxl when exporting tables to Excel
 
 ## Installation
 
@@ -46,7 +48,7 @@ pip install ssb-flextab
 
 ## Usage
 
-Please see the [Reference Guide] for details.
+A [Tutorial](demos/tutorial.py) is found in the in the `demos` folder. 
 
 ## Contributing
 

@@ -1,0 +1,25 @@
+{
+  "_commit": "57b7b713c78245687a1d5421aba8bf01bead2245",
+  "_copy_without_render": [
+    "*.rst_t"
+  ],
+  "_jinja2_env_vars": {
+    "lstrip_blocks": true,
+    "trim_blocks": true
+  },
+  "_template": "https://github.com/statisticsnorway/ssb-pypitemplate.git",
+  "author": "Kristian L\u00f8n\u00f8",
+  "code_quality_level": "Medium",
+  "copyright_owner": "Kristian L\u00d8\u00f8n\u00f8",
+  "copyright_year": "2026",
+  "department_number": "702",
+  "dependency_manager_tool": "poetry",
+  "development_status": "Development Status :: 4 - Beta",
+  "email": "krl@ssb.no",
+  "friendly_name": "SSB flextab",
+  "github_organization": "statisticsnorway",
+  "license": "MIT",
+  "package_name": "ssb-flextab",
+  "project_name": "ssb-flextab",
+  "version": "0.1.0"
+}

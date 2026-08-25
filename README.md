@@ -26,7 +26,11 @@
 
 ## Features
 
-- TODO
+Flextab is a Python package for making *flex*ible *tab*ulation. It is made with Claude AI, models Sonnet 4.5 and Sonnet 5.
+
+Flextab is based on the Sas procedure [proc tabulate]( https://documentation.sas.com/doc/en/pgmsascdc/9.4_3.5/proc/n00yutbvvckjwrn1ldg5xkvjy1pu.htm) which again was based on the [tpl language](https://en.wikipedia.org/wiki/TPL_Tables)
+
+It makes tables in two dimensions, rows an columns
 
 ## Requirements
 

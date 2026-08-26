@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ssb-flextab.functions.flextab import flextab, flextab_to_string, FlextabResult
+from ssb_flextab.flextab import flextab, flextab_to_string, FlextabResult
 
 
 # ---------------------------------------------------------------------------

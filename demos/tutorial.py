@@ -20,12 +20,6 @@ if src_path.exists():
     
 from ssb_flextab.flextab import flextab, flextab_to_string, FlextabResult
 
-# %%
-str(Path.cwd().parent / "src")
-
-# %%
-str(src_path)
-
 # %% [markdown]
 # ## Data set for tutorial
 
@@ -350,6 +344,7 @@ flextab(
     """
 )
 
+# %%
 flextab(
     data=df,
     groupby=["region", "sex"],
@@ -361,6 +356,7 @@ flextab(
     """
 )
 
+# %%
 flextab(
     data=df,
     groupby=["region", "sex"],
@@ -372,6 +368,7 @@ flextab(
     """
 )
 
+# %%
 flextab(
     data=df,
     groupby=["region", "sex"],
@@ -383,6 +380,7 @@ flextab(
     """
 )
 
+# %%
 flextab(
     data=df,
     groupby=["region", "sex"],
@@ -523,6 +521,7 @@ flextab(
     sort_by='label'
 )
 
+# %%
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -620,7 +619,7 @@ tab = flextab(
     style=tabstyle
 )
 
-excel_filename="../../reports/tab1.xlsx"
+excel_filename="../reports/tab1.xlsx"
 
 tab.to_excel(excel_filename)
 
@@ -646,6 +645,6 @@ tab = flextab(
 
 tab_md = tab.to_markdown()
 
-markdown_filename="../../reports/tab1.md"
+markdown_filename="../reports/tab1.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab_md)

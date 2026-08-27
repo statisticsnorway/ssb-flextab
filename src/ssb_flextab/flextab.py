@@ -670,11 +670,9 @@ def flextab(
         data_iter = iter(dvals)
 
         row = [""] * D
-        group_slots_pos = [i for i, e in enumerate(path_order) if e[0] == "group"]
 
         # Slots used by THIS spec's path_order positions
         my_slots = slots[-len(path_order):]   # align from bottom
-        my_D = sum(my_slots)
 
         def slot_range(local_pos):
             # local_pos is the index within path_order (0 = outermost of THIS spec)

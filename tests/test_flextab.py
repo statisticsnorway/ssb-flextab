@@ -316,8 +316,12 @@ class TestFormatting:
                     table="sex, income=''*MEAN*format=8,0")
         text = flextab_to_string(r)
         # 0 decimal places -> no "." in the formatted mean values
-        mean_lines = [l for l in text.splitlines() if "1" in l or "2" in l]
-        assert any("." not in l.split()[-1] for l in mean_lines)
+        mean_lines = [
+            line
+            for line in text.splitlines()
+            if "1" in line or "2" in line
+        ]
+        assert any("." not in line.split()[-1] for line in mean_lines)
 
     def test_na_rep_used_for_missing_cells(self, df):
         r = flextab(data=df, groupby=["sex", "region"],

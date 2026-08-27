@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 from .formatting import _format_dataframe
 
+
 class FlextabResult(pd.DataFrame):
-    """
-    DataFrame subclass returned by flextab().
+    """DataFrame subclass returned by flextab().
 
     Numeric values are fully preserved — arithmetic, .sum(), slicing, and
     all other DataFrame operations work exactly as on a plain DataFrame.
@@ -40,8 +39,7 @@ class FlextabResult(pd.DataFrame):
 
     @staticmethod
     def _to_hex(color) -> str:
-        """
-        Normalise a colour specification to a 6-character uppercase hex string
+        """Normalise a colour specification to a 6-character uppercase hex string
         (no '#' prefix) suitable for openpyxl and CSS.
 
         Accepts:
@@ -82,8 +80,7 @@ class FlextabResult(pd.DataFrame):
 
     @staticmethod
     def _resolve_color(spec, idx: int):
-        """
-        Resolve a style-dict colour spec for row/band index `idx`.
+        """Resolve a style-dict colour spec for row/band index `idx`.
 
         Every style key (header_bg/fg, row_bg/fg, row_header_bg/fg,
         cell_bg/fg) uses this same technique:
@@ -105,8 +102,7 @@ class FlextabResult(pd.DataFrame):
 
     @staticmethod
     def _fmt_to_excel_numfmt(formatter) -> str:
-        """
-        Convert a _parse_fmt_spec formatter to an Excel number format string.
+        """Convert a _parse_fmt_spec formatter to an Excel number format string.
 
         Inspects the closure variables of the formatter to reliably determine
         decimals, decimal-comma, and thousands-separator settings — rather than
@@ -167,8 +163,7 @@ class FlextabResult(pd.DataFrame):
         return self.__repr__()
 
     def _repr_html_(self):
-        """
-        Jupyter/IPython HTML display with format= specs AND inline CSS
+        """Jupyter/IPython HTML display with format= specs AND inline CSS
         colours from the style= parameter applied.
 
         Style keys and what they colour (see flextab()'s style= docstring
@@ -229,8 +224,8 @@ class FlextabResult(pd.DataFrame):
             any_style = any([header_bg_spec, header_fg_spec, row_bg_spec, row_fg_spec,
                               rh_bg_spec, rh_fg_spec, cell_bg_spec, cell_fg_spec])
             if any_style:
-                import re as _re
                 import html as _html
+                import re as _re
                 lines = html.splitlines()
                 out = []
                 data_row_idx = 0
@@ -320,8 +315,7 @@ class FlextabResult(pd.DataFrame):
     # ── Excel export ──────────────────────────────────────────────────────
 
     def to_excel(self, excel_writer, sheet_name="Sheet1", **kwargs):
-        """
-        Write to an Excel file with number formatting and colour styling
+        """Write to an Excel file with number formatting and colour styling
         preserved via openpyxl post-processing.
 
         Parameters
@@ -352,7 +346,7 @@ class FlextabResult(pd.DataFrame):
         Every key accepts a single colour (applied to every row) or a
         (colour0, colour1) 2-tuple that cycles through rows.
 
-        Notes
+        Notes:
         -----
         If excel_writer is a file path (str or Path), the file is written
         and post-processed in one step. If it is an open ExcelWriter, the
@@ -362,7 +356,8 @@ class FlextabResult(pd.DataFrame):
         import io
         try:
             from openpyxl import load_workbook
-            from openpyxl.styles import PatternFill, Font
+            from openpyxl.styles import Font
+            from openpyxl.styles import PatternFill
             HAS_OPENPYXL = True
         except ImportError:
             HAS_OPENPYXL = False

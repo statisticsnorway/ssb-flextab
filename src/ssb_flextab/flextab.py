@@ -3,21 +3,15 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .parser import (
-    parse_table,
-    _expand_node_with_branch,
-    _classify_path,
-)
-
-from .statistics import (
-    _compute_series,
-    _compute_all_series,
-    _compute_custom_pct
-)
-
+from .formatting import _parse_fmt_spec
+from .formatting import flextab_to_string
+from .parser import _classify_path
+from .parser import _expand_node_with_branch
+from .parser import parse_table
 from .result import FlextabResult
-
-from .formatting import flextab_to_string, _parse_fmt_spec
+from .statistics import _compute_all_series
+from .statistics import _compute_custom_pct
+from .statistics import _compute_series
 
 """
 flextab.py
@@ -205,8 +199,8 @@ _SENTINEL = "__total__"
 
 def flextab(
     data: pd.DataFrame,
-    measure: "str | list" = None,
-    groupby: "str | list" = None,
+    measure: str | list = None,
+    groupby: str | list = None,
     table: str = None,
     include_missing_in_groupby: bool = True,
     fmt: str = "{:.1f}",
@@ -217,8 +211,7 @@ def flextab(
     row_header: str = None,
     style: dict = None,
 ) -> pd.DataFrame:
-    """
-    Build a cross-tabulation table, equivalent to SAS PROC TABULATE.
+    """Build a cross-tabulation table, equivalent to SAS PROC TABULATE.
 
     Returns a FlextabResult — a pd.DataFrame subclass that keeps the
     underlying values numeric (for further computation or export) but
@@ -270,7 +263,7 @@ def flextab(
             ALL or TOTAL -> grand total
           Multiple tokens: first one that applies to the subtable is used.
 
-          Examples:
+    Examples:
             tax*pctsum<income>           tax as % of income
             income*pctsum<gender all>    % of gender subtotal; ALL fallback
             pctn<origin all>             count % of origin subtotal
@@ -369,7 +362,7 @@ def flextab(
                 'cell_bg': ('white', '#EBF3FB'),  # row0=white, row1=pale blue
             }
 
-    Returns
+    Returns:
     -------
     FlextabResult
         A pd.DataFrame subclass.  Numeric values are preserved for
@@ -537,8 +530,7 @@ def flextab(
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
     def _index_value_key(orig_col, v):
-        """
-        Sort key for sort_by='index': order by each value's POSITION in the
+        """Sort key for sort_by='index': order by each value's POSITION in the
         labels dict as written by the caller (dict insertion order).
 
         Looks up v ONLY in labels[orig_col] (the dict belonging to this
@@ -557,8 +549,7 @@ def flextab(
         return (1, _na_safe_str(v))
 
     def _label_text_value_key(orig_col, v):
-        """
-        Sort key for sort_by='label': order alphabetically by the DISPLAY
+        """Sort key for sort_by='label': order alphabetically by the DISPLAY
         LABEL TEXT (the dict's value), not by dict-write order and not by
         the raw code.
 
@@ -604,8 +595,7 @@ def flextab(
             matrix[rk_pos[rk], ck_pos[ck]] = val
 
     def _fmt_val(v, col_name=None):
-        """
-        Format a group key value for display, applying label remapping.
+        """Format a group key value for display, applying label remapping.
 
         col_name : the original groupby column this value belongs to. Only
                    that column's label dict (labels[col_name]) is consulted,
@@ -629,8 +619,7 @@ def flextab(
         return str(v)
 
     def _compute_slot_layout(all_path_orders):
-        """
-        Compute display slots per position across all specs.
+        """Compute display slots per position across all specs.
 
         Each cross-position gets:
           2 slots  if ANY spec has kind='group' there WITH a non-blank label
@@ -654,8 +643,7 @@ def flextab(
         return slots
 
     def _key_to_label_slotted(hdr, data_key, path_order, slots):
-        """
-        Build a fixed-length index tuple using a pre-computed slot layout.
+        """Build a fixed-length index tuple using a pre-computed slot layout.
 
         D = sum(slots) levels total. Slots assigned bottom-up: the innermost
         (rightmost) path_order position occupies the lowest (rightmost) slots.
@@ -729,8 +717,7 @@ def flextab(
         return tuple(row) if any(row) else ("",)
 
     def make_index(keys, hdr_path):
-        """
-        Convert (hdr, data_key) pairs to a MultiIndex using slot-based layout.
+        """Convert (hdr, data_key) pairs to a MultiIndex using slot-based layout.
 
         Every spec in the dimension produces a fixed-length tuple of the same
         depth D = sum(slots), where the slot layout is computed globally so
@@ -745,7 +732,7 @@ def flextab(
         is dropped — these are structural artefacts (e.g. the label slot of a
         group whose label was suppressed with ='') that carry no information.
 
-        Examples
+        Examples:
         --------
         Expression ``n colpctn*(all age_group)`` produces specs:
           [stat:N]                         → ('N',)        1 position
@@ -847,8 +834,7 @@ def flextab(
     return result
 
 def _sort_row_keys(row_keys: list, hdr_path: dict = None, value_key_fn=None) -> list:
-    """
-    Re-order row/column keys to follow the TABLE expression's written order.
+    """Re-order row/column keys to follow the TABLE expression's written order.
 
     Two ordering rules combine, applied in this priority:
 
@@ -1016,8 +1002,7 @@ _NAN_SENTINEL = "__nan__"
 
 
 def _normalise_key(val):
-    """
-    Normalise a group key value so that all missing-value representations
+    """Normalise a group key value so that all missing-value representations
     (float nan, pd.NA, pd.NaT, None) map to a single canonical object.
     This prevents duplicate row/column keys when different aggregation calls
     (e.g. groupby on a column vs .size()) return different NA types.

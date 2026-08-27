@@ -1,13 +1,12 @@
-from dataclasses import dataclass, field
-from typing import Callable, Optional
 import re
+from dataclasses import dataclass
+from dataclasses import field
 
 from .statistics import ALL_STATS
 
 
 def _tokenize(expr: str) -> list[tuple]:
-    """
-    Tokenize a single TABLE dimension expression into a flat list of tokens.
+    """Tokenize a single TABLE dimension expression into a flat list of tokens.
 
     Token types emitted:
       ('NAME', name, label)     a variable or keyword name; label is the
@@ -70,10 +69,9 @@ def _tokenize(expr: str) -> list[tuple]:
 
 @dataclass
 class DimNode:
-    """
-    A node in the parsed TABLE expression tree.
+    """A node in the parsed TABLE expression tree.
 
-    Attributes
+    Attributes:
     ----------
     kind : str
         One of:
@@ -106,10 +104,10 @@ class DimNode:
         Sub-nodes for cross/concat/group kinds.
     """
     kind: str
-    name: Optional[str] = None
-    label: Optional[str] = None
-    fmt:   Optional[str] = None
-    denom: Optional[str] = None
+    name: str | None = None
+    label: str | None = None
+    fmt:   str | None = None
+    denom: str | None = None
     children: list["DimNode"] = field(default_factory=list)
 
     def display_label(self) -> str:
@@ -139,7 +137,7 @@ class _Parser:
         while self.pos < len(self.tokens) and self.tokens[self.pos][0] == "SP":
             self.pos += 1
 
-    def peek(self) -> Optional[tuple]:
+    def peek(self) -> tuple | None:
         p = self.pos
         while p < len(self.tokens) and self.tokens[p][0] == "SP":
             p += 1
@@ -197,8 +195,7 @@ class _Parser:
         return nodes[0] if len(nodes) == 1 else DimNode(kind="cross", children=nodes)
 
     def _apply_fmt(self, node: DimNode, fmt_spec: str):
-        """
-        Apply a format= spec to a node.
+        """Apply a format= spec to a node.
 
         For a leaf node (var/all), the format is set directly on it - this
         is the simple "mean*format=7,1" case.
@@ -246,9 +243,10 @@ class _Parser:
             return DimNode(kind="var", name=t[1], label=label, fmt=fmt, denom=denom)
         raise SyntaxError(f"Unexpected token: {t}")
 
-    def _consume_fmt(self) -> Optional[str]:
+    def _consume_fmt(self) -> str | None:
         """Consume and return a FMT token immediately following the current
-        position (skipping a single space), or return None."""
+        position (skipping a single space), or return None.
+        """
         p = self.pos
         # Allow one optional space between token and format=
         if p < len(self.tokens) and self.tokens[p][0] == "SP":
@@ -258,9 +256,10 @@ class _Parser:
             return self.tokens[p][1]
         return None
 
-    def _consume_denom(self) -> Optional[str]:
+    def _consume_denom(self) -> str | None:
         """Consume and return a DENOM token (e.g. the 'income' from
-        pctsum<income>) immediately after the current position, or None."""
+        pctsum<income>) immediately after the current position, or None.
+        """
         p = self.pos
         if p < len(self.tokens) and self.tokens[p][0] == "SP":
             p += 1
@@ -271,8 +270,7 @@ class _Parser:
 
 
 def _split_dimensions(expr: str) -> list[str]:
-    """
-    Split on top-level commas (not inside parentheses or quoted strings).
+    """Split on top-level commas (not inside parentheses or quoted strings).
 
     A comma that is the DECIMAL SEPARATOR in a format=W,D[_|s] spec
     (immediately following the width digits of "format=", e.g.
@@ -347,8 +345,7 @@ def _expand_node(node: DimNode) -> list[list[DimNode]]:
 
 
 def _expand_node_with_branch(node: DimNode):
-    """
-    Like _expand_node, but additionally returns a top-level branch index for
+    """Like _expand_node, but additionally returns a top-level branch index for
     each path, used to order specs that come from a TOP-LEVEL concatenation
     (space-separated dimension root) in written left-to-right order.
 

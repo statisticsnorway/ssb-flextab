@@ -1,5 +1,4 @@
-"""
-pytest test suite for flextab.py
+"""pytest test suite for flextab.py
 
 Run with:
     pytest test_flextab.py -v
@@ -13,8 +12,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ssb_flextab import FlextabResult, flextab, flextab_to_string
-
+from ssb_flextab import FlextabResult
+from ssb_flextab import flextab
+from ssb_flextab import flextab_to_string
 
 # ---------------------------------------------------------------------------
 # Fixtures

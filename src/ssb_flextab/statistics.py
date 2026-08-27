@@ -3,9 +3,9 @@ from collections.abc import Callable
 import numpy as np
 import pandas as pd
 
+
 def _hmean(x):
-    """
-    Unweighted harmonic mean: n / sum(1/x), excluding NaN and zero values.
+    """Unweighted harmonic mean: n / sum(1/x), excluding NaN and zero values.
 
     Zero and NaN values are excluded before computing because:
     - 1/0 is undefined (would produce inf or division error)
@@ -91,8 +91,7 @@ _BASE_STATS: dict[str, Callable] = {
 # functions below are called.
 
 def _drop_nan_x(x, w):
-    """
-    Drop rows where the measure value x is NaN, keeping x and w aligned.
+    """Drop rows where the measure value x is NaN, keeping x and w aligned.
 
     This must happen before any weighted-stat formula runs: pandas .sum()
     silently skips NaN in the NUMERATOR (x*w), but the weight itself is a
@@ -178,11 +177,10 @@ def _whmean(x, w):
     return wsum / (ww / xw).sum()
 
 def _clean_weights(weights: pd.Series) -> pd.Series:
-    """
-    Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column:
-      - missing weight  -> NaN (caller must drop these rows entirely)
-      - negative weight -> treated as 0 (observation still counted in N)
-      - zero / positive -> unchanged
+    """Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column:
+    - missing weight  -> NaN (caller must drop these rows entirely)
+    - negative weight -> treated as 0 (observation still counted in N)
+    - zero / positive -> unchanged
     """
     cleaned = weights.copy()
     cleaned[cleaned < 0] = 0
@@ -222,8 +220,7 @@ _PERCENT_STATS = {
 ALL_STATS = set(_BASE_STATS) | _PERCENT_STATS
 
 def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, weight=None):
-    """
-    Compute an aggregated Series for a single (row_spec, col_spec) pair
+    """Compute an aggregated Series for a single (row_spec, col_spec) pair
     when neither spec carries an ALL/TOTAL token — i.e. both dimensions
     are pure groupby-value breakdowns with no marginal totals.
 
@@ -238,11 +235,11 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
     missing    : passed as dropna=not-missing to groupby
     weight     : optional weight column name
 
-    Returns
+    Returns:
     -------
     pd.Series  indexed by the all_groups groupby key(s)
 
-    Notes
+    Notes:
     -----
     Percentage stats (PCTN, PCTSUM, ROWPCTN, COLPCTN, ROWPCTSUM,
     COLPCTSUM) route through this function. Their denominator is
@@ -366,8 +363,7 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
 
 def _compute_all_series(data, groups_to_keep, var, stat, missing,
                         r_groups=None, c_groups=None, weight=None):
-    """
-    Compute an aggregated Series for a spec that involves an ALL/TOTAL
+    """Compute an aggregated Series for a spec that involves an ALL/TOTAL
     marginal total in at least one dimension.
 
     This handles the three ALL cases:
@@ -390,7 +386,7 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
     c_groups       : col-dimension groupby columns (for ROWPCTN denominator)
     weight         : optional weight column name
 
-    Notes
+    Notes:
     -----
     For COLPCTN/COLPCTSUM: denominator = column total (grouped by c_groups).
     For ROWPCTN/ROWPCTSUM: denominator = row total   (grouped by r_groups).
@@ -522,8 +518,7 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
     return 100.0 * series / grand
 
 def _parse_denom_def(denom_str: str) -> list[str]:
-    """
-    Parse the content of a <...> denominator definition into an ordered
+    """Parse the content of a <...> denominator definition into an ordered
     list of uppercase token strings.
 
     Each token is one of:
@@ -536,7 +531,7 @@ def _parse_denom_def(denom_str: str) -> list[str]:
     denominator.  Placing ALL/TOTAL last provides a fallback for cells where
     none of the named variables participate.
 
-    Examples
+    Examples:
     --------
     'income'       -> ['INCOME']
     'gender all'   -> ['GENDER', 'ALL']
@@ -560,8 +555,7 @@ def _compute_custom_pct(
     r_path_order: list = None,
     c_path_order: list = None,
 ) -> pd.Series:
-    """
-    Compute a percentage statistic with a user-defined denominator.
+    """Compute a percentage statistic with a user-defined denominator.
 
     This implements the PCTN<...> and PCTSUM<...> syntax, where the content
     of <...> specifies what the denominator should be.
@@ -589,7 +583,7 @@ def _compute_custom_pct(
       - If no matching token is found, fall back left-to-right through the
         token list as before, or to grand total as a final fallback.
 
-    Examples
+    Examples:
     --------
     pctn<total gender age_group>  with row spec origin*(Total gender age_group):
       Total row  -> innermost=all  -> token 'total' -> grand total denom

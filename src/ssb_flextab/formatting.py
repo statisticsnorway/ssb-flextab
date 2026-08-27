@@ -1,9 +1,10 @@
-import pandas as pd
 import re
 
+import pandas as pd
+
+
 def _parse_fmt_spec(spec: str):
-    """
-    Parse a format specification string and return a callable formatter.
+    """Parse a format specification string and return a callable formatter.
 
     Called internally when a *format=... suffix is encountered in the TABLE
     expression.  The resulting formatter is stored in result.attrs['col_fmt_map']
@@ -25,7 +26,7 @@ def _parse_fmt_spec(spec: str):
     The W and sep together determine the output style — W itself is not
     used for padding since flextab() returns string-valued cells.
 
-    Examples
+    Examples:
     --------
       "7.1"   -> 1 decimal, point:              1 234.6
       "7,2"   -> 2 decimals, comma:             1 234,56
@@ -34,7 +35,7 @@ def _parse_fmt_spec(spec: str):
       "9.0s"  -> 0 decimals, space thousands:   1 235
       "7,2s"  -> 2 decimals, comma + space:     1 234,56
 
-    Returns
+    Returns:
     -------
     Callable (value: Any) -> str
         A formatting function.  Non-numeric values are returned as str(value).
@@ -77,8 +78,7 @@ def _parse_fmt_spec(spec: str):
     return _fmt
 
 def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
-    """
-    Build a string-valued copy of result with per-column AND per-row formats
+    """Build a string-valued copy of result with per-column AND per-row formats
     applied.
 
     A format= spec can appear on either the row or the column dimension of
@@ -112,8 +112,7 @@ def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
     return formatted
 
 def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
-    """
-    Render a flextab() result as a formatted string.
+    """Render a flextab() result as a formatted string.
 
     Parameters
     ----------
@@ -128,19 +127,19 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
     na_rep : str, default "."
         Text shown in place of NaN / missing cells.
 
-    Returns
+    Returns:
     -------
     str
         A fixed-width string suitable for printing.
 
-    Notes
+    Notes:
     -----
     Per-cell format= specs from the TABLE expression (e.g. *format=7,1
     or *format=12.0s) take precedence over the fmt parameter for their
     specific cells.  The fmt parameter acts as the default for any cell
     without an explicit format= spec.
 
-    Examples
+    Examples:
     --------
     print(flextab_to_string(r))                   # default fmt
     print(flextab_to_string(r, fmt="{:.0f}"))     # 0 decimals everywhere
@@ -150,8 +149,7 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
 
 
 def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
-    """
-    Render a flextab() result as a plain Markdown table, with flattened,
+    """Render a flextab() result as a plain Markdown table, with flattened,
     human-readable column headers instead of the raw index tuples that
     pandas' inherited DataFrame.to_markdown() shows for a MultiIndex, and
     with format= specs from the TABLE expression applied to the numbers.
@@ -194,12 +192,12 @@ def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
         Separator used to join a MultiIndex column's levels into one
         header label.
 
-    Returns
+    Returns:
     -------
     str
         A GitHub-flavoured Markdown table.
 
-    Examples
+    Examples:
     --------
     print(flextab_to_markdown(r))
     with open("table.md", "w") as f:

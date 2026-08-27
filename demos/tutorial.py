@@ -3,6 +3,7 @@
 
 # %%
 import pandas as pd
+from pprint import pprint
 
 from ssb_flextab import FlextabResult, flextab, flextab_to_string
 
@@ -19,7 +20,6 @@ df = pd.DataFrame({
     "tax": [100, 10, 200, 90, 340, 370, 30, None, 150, 150],
     "weight": [1.5, 3.2, 1.7, 2.2, 6.1, 4.2, 1.9, 4.8, None, 8.2]
 })
-df
 
 labels = {
     'sex': 
@@ -46,7 +46,8 @@ labels = {
         '1': 'Elementary school'
     }
 }
-labels
+pprint(df)
+pprint(labels)
 
 # %% [markdown]
 # With just defining a groupby column it will count the number of observations (N)

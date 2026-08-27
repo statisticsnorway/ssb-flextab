@@ -23,7 +23,7 @@ documentation = "https://statisticsnorway.github.io/ssb-flextab"
 Changelog = "https://github.com/statisticsnorway/ssb-flextab/releases"
 
 [project.scripts]
-ssb-flextab = "ssb-flextab.__main__:main"
+ssb-flextab = "ssb_flextab.__main__:main"
 
 [dependency-groups]
 lint = [
@@ -58,7 +58,7 @@ dev = [
 [tool.poetry]
 classifiers = ["Development Status :: 4 - Beta"]
 requires-poetry = ">=2.3"
-packages = [{ include = "ssb-flextab", from = "src" }]
+packages = [{ include = "ssb_flextab", from = "src" }]
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.9"

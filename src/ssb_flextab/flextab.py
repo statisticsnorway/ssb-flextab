@@ -789,7 +789,7 @@ def flextab(
     # Each column spec may carry a fmt spec from the TABLE expression.
     col_fmt_map = {}
     for j, ck in enumerate(all_col_keys):
-        c_hdr, c_data = ck
+        c_hdr, _ = ck
         for c_spec in col_specs:
             if spec_header(c_spec) == c_hdr and c_spec.get("fmt"):
                 col_fmt_map[j] = _parse_fmt_spec(c_spec["fmt"])
@@ -801,7 +801,7 @@ def flextab(
     # of the column dimension, as in "n*format=6,0 rowpctn*format=7,1, ...").
     row_fmt_map = {}
     for i, rk in enumerate(all_row_keys):
-        r_hdr, r_data = rk
+        r_hdr, _ = rk
         for r_spec in row_specs:
             if spec_header(r_spec) == r_hdr and r_spec.get("fmt"):
                 row_fmt_map[i] = _parse_fmt_spec(r_spec["fmt"])

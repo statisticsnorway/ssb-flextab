@@ -13,7 +13,7 @@
   "copyright_owner": "Kristian L\u00d8\u00f8n\u00f8",
   "copyright_year": "2026",
   "department_number": "702",
-  "dependency_manager_tool": "poetry",
+  "dependency_manager_tool": "uv",
   "development_status": "Development Status :: 4 - Beta",
   "email": "krl@ssb.no",
   "friendly_name": "SSB flextab",

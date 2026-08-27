@@ -16,7 +16,7 @@
       "license": "MIT",
       "development_status": "Development Status :: 4 - Beta",
       "code_quality_level": "Medium",
-      "dependency_manager_tool": "poetry",
+      "dependency_manager_tool": "uv",
       "department_number": "702",
       "_copy_without_render": [
         "*.rst_t"

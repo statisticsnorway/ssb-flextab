@@ -177,11 +177,11 @@ def _whmean(x, w):
     return wsum / (ww / xw).sum()
 
 def _clean_weights(weights: pd.Series) -> pd.Series:
-    """Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column:
+    """Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column.
 
-    - missing weight  -> NaN (caller must drop these rows entirely)
-    - negative weight -> treated as 0 (observation still counted in N)
-    - zero / positive -> unchanged
+    - Missing weight -> NaN (caller must drop these rows entirely).
+    - Negative weight -> treated as 0 (observation still counted in N).
+    - Zero or positive weight -> unchanged.
     """
     cleaned = weights.copy()
     cleaned[cleaned < 0] = 0
@@ -221,7 +221,7 @@ _PERCENT_STATS = {
 ALL_STATS = set(_BASE_STATS) | _PERCENT_STATS
 
 def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, weight=None):
-    """Compute an aggregated Series for a single (row_spec, col_spec) pair
+    """Compute an aggregated Series for a single (row_spec, col_spec) pair.
 
     When neither spec carries an ALL/TOTAL token — i.e. both dimensions
     are pure groupby-value breakdowns with no marginal totals.

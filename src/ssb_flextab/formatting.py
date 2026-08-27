@@ -1,3 +1,6 @@
+from typing import Any
+
+
 import re
 
 import pandas as pd
@@ -110,7 +113,7 @@ def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
     formatted.columns = result.columns
     return formatted
 
-def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
+def flextab_to_string(result, fmt="{:.3f}", na_rep=".") -> str:
     """Render a flextab() result as a formatted string.
 
     Parameters

@@ -111,11 +111,13 @@ class DimNode:
     children: list["DimNode"] = field(default_factory=list)
 
     def display_label(self) -> str:
+        """Display label."""
         if self.label is None:
             return self.name if self.name else ""
         return self.label
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a developer-friendly representation of the node."""
         suffix = f"='{self.label}'" if self.label is not None else ""
         if self.kind == "var":
             return f"{self.name}{suffix}"
@@ -129,7 +131,7 @@ class DimNode:
 
 
 class _Parser:
-    def __init__(self, tokens: list[tuple]):
+    def __init__(self, tokens: list[tuple]) -> None:
         self.tokens = tokens
         self.pos = 0
 
@@ -244,7 +246,7 @@ class _Parser:
         raise SyntaxError(f"Unexpected token: {t}")
 
     def _consume_fmt(self) -> str | None:
-        """Consume and return a FMT token"""
+        """Consume and return a FMT token."""
         p = self.pos
         # Allow one optional space between token and format=
         if p < len(self.tokens) and self.tokens[p][0] == "SP":
@@ -255,7 +257,7 @@ class _Parser:
         return None
 
     def _consume_denom(self) -> str | None:
-        """Consume and return a DENOM token
+        """Consume and return a DENOM token.
         
         (e.g. the 'income' from
         pctsum<income>) immediately after the current position, or None.
@@ -315,6 +317,7 @@ def _split_dimensions(expr: str) -> list[str]:
 
 
 def parse_table(table_str: str) -> tuple:
+    """Parse table."""
     dims = _split_dimensions(table_str)
     if len(dims) > 2:
         raise ValueError("TABLE supports at most 2 dimensions (row, col). The page dimension is not supported.")

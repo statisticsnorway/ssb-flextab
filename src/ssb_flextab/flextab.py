@@ -552,7 +552,7 @@ def flextab(
         return (1, _na_safe_str(v))
 
     def _label_text_value_key(orig_col, v):
-        """Sort key for sort_by='label': order alphabetically by the DISPLAY
+        """Sort key for sort_by='label': order alphabetically by the DISPLAY.
 
         LABEL TEXT (the dict's value), not by dict-write order and not by
         the raw code.
@@ -1004,7 +1004,7 @@ _NAN_SENTINEL = "__nan__"
 
 
 def _normalise_key(val):
-    """Normalise a group key value so that all missing-value representations
+    """Normalise a group key value so that all missing-value representations.
     
     (float nan, pd.NA, pd.NaT, None) map to a single canonical object.
     This prevents duplicate row/column keys when different aggregation calls

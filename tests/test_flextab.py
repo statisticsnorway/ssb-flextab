@@ -1,4 +1,4 @@
-"""pytest test suite for flextab.py
+"""pytest test suite for flextab.py.
 
 Run with:
     pytest test_flextab.py -v

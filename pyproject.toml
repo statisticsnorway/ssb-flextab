@@ -11,6 +11,8 @@ dynamic = ["classifiers"]
 dependencies = [
     "click>=8.0.1",
     "pytest (>=9.1.1,<10.0.0)",
+    "numpy (>=2.5.2,<3.0.0)",
+    "pandas (>=3.0.5,<4.0.0)",
 ]
 
 [project.urls]

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-def _hmean(x):
+def _hmean(x: pd.Series) -> float:
     """Unweighted harmonic mean: n / sum(1/x), excluding NaN and zero values.
 
     Zero and NaN values are excluded before computing because:
@@ -90,7 +90,10 @@ _BASE_STATS: dict[str, Callable] = {
 # This cleaning step is applied once in _clean_weights() before any of the
 # functions below are called.
 
-def _drop_nan_x(x, w):
+def _drop_nan_x(
+    x: pd.Series,
+    w: pd.Series,
+) -> tuple[pd.Series, pd.Series]:
     """Drop rows where the measure value x is NaN, keeping x and w aligned.
 
     This must happen before any weighted-stat formula runs: pandas .sum()
@@ -103,13 +106,19 @@ def _drop_nan_x(x, w):
     mask = x.notna()
     return x[mask], w[mask]
 
-def _wmean(x, w):
+def _wmean(
+    x: pd.Series,
+    w: pd.Series,
+) -> float:
     # Weighted arithmetic mean: x_bar_w = (sum w*x) / (sum w)
     x, w = _drop_nan_x(x, w)
     wsum = w.sum()
     return (x * w).sum() / wsum if wsum else np.nan
 
-def _wvar(x, w):
+def _wvar(
+    x: pd.Series,
+    w: pd.Series,
+) -> float:
     # Weighted variance, UNBIASED (reliability-weights) estimator:
     #   Var_w = [ (sum w) / ((sum w)^2 - sum w^2) ] * sum( w*(x - xbar_w)^2 )
     # This reduces to the familiar sum((x-xbar)^2)/(n-1) when all w_i = 1,

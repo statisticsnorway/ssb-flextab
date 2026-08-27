@@ -375,7 +375,9 @@ def _expand_node_with_branch(node: DimNode):
         return result
     return [(0, path) for path in _expand_node(node)]
 
-def _classify_path(path, measure_list, groupby_list):
+def _classify_path(
+    path: list[DimNode], measure_list: list[str], groupby_list: list[str]
+):
     measure_map = {m.upper(): m for m in measure_list}
     groupby_map = {g.upper(): g for g in groupby_list}
 

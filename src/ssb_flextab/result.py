@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import ClassVar
 
 import pandas as pd
 
@@ -29,7 +30,7 @@ class FlextabResult(pd.DataFrame):
     style        : dict  colour styling (see flextab() style= parameter)
     """
 
-    _metadata = []
+    _metadata: ClassVar[list[str]] = []
 
     @property
     def _constructor(self):
@@ -281,7 +282,7 @@ class FlextabResult(pd.DataFrame):
                         if row_css:
                             line = _re.sub(
                                 r'<th\b([^>]*?)>',
-                                lambda m: f'<th{m.group(1)} style="{row_css}">',
+                                lambda m, css=row_css: f'<th{m.group(1)} style="{css}">',
                                 line,
                             )
 
@@ -293,7 +294,7 @@ class FlextabResult(pd.DataFrame):
                         if cell_css:
                             line = _re.sub(
                                 r'<td\b([^>]*?)>',
-                                lambda m: f'<td{m.group(1)} style="{cell_css}">',
+                                lambda m, css=cell_css: f'<td{m.group(1)} style="{css}">',
                                 line,
                             )
 

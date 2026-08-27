@@ -1,5 +1,4 @@
-"""
-flextab.py
+"""flextab.py
 ===========
 A Python implementation of SAS PROC TABULATE.
 
@@ -75,7 +74,7 @@ Custom denominator definitions
   Multiple tokens are tried left-to-right; the first one that "participates
   in the current subtable" is used.  Use ALL/TOTAL as a fallback.
 
-  Examples:
+Examples:
     tax*pctsum<income>               -> tax as % of income (ratio)
     income*pctsum<gender all>        -> income as % of gender subtotal;
                                         falls back to grand total when
@@ -154,7 +153,7 @@ HEADER LEVEL RULES
   - Entirely-blank levels are removed from the final MultiIndex
   - Shorter specs align at the bottom (front-padded), not the top
 
-EXAMPLES
+Examples:
 ========
   # Basic grouped table
   flextab(data=df, groupby=["origin"], measure=["msrp"],
@@ -182,19 +181,20 @@ EXAMPLES
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Callable, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from dataclasses import field
+
 import numpy as np
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # 1. STATISTICS REGISTRY
 # ---------------------------------------------------------------------------
 
+
 def _hmean(x):
-    """
-    Unweighted harmonic mean: n / sum(1/x), excluding NaN and zero values.
+    """Unweighted harmonic mean: n / sum(1/x), excluding NaN and zero values.
 
     Zero and NaN values are excluded before computing because:
     - 1/0 is undefined (would produce inf or division error)
@@ -210,37 +210,38 @@ def _hmean(x):
         return np.nan
     return len(x) / (1.0 / x).sum()
 
+
 _BASE_STATS: dict[str, Callable] = {
     # ── Count statistics ────────────────────────────────────────────────────
     # N, COUNT and SIZE may all be used WITHOUT a measure column (bare count).
-    "N":      lambda x: x.count(),   # backward-compatible alias for COUNT
-    "COUNT":  lambda x: x.count(),   # like pandas Series.count(): counts
-                                      # only NON-MISSING values of the measure
-    "SIZE":   lambda x: x.size,      # like Python len() / numpy .size:
-                                      # counts ALL rows, including those where
-                                      # the measure is missing/NaN
+    "N": lambda x: x.count(),  # backward-compatible alias for COUNT
+    "COUNT": lambda x: x.count(),  # like pandas Series.count(): counts
+    # only NON-MISSING values of the measure
+    "SIZE": lambda x: x.size,  # like Python len() / numpy .size:
+    # counts ALL rows, including those where
+    # the measure is missing/NaN
     # NMISS requires a measure column (there must be something to be missing)
-    "NMISS":  lambda x: x.isna().sum(),
+    "NMISS": lambda x: x.isna().sum(),
     # ── Descriptive statistics (all require a measure column) ────────────────
-    "SUM":    lambda x: x.sum(),
-    "MEAN":   lambda x: x.mean(),
-    "MIN":    lambda x: x.min(),
-    "MAX":    lambda x: x.max(),
-    "STD":    lambda x: x.std(),      # sample std dev (VARDEF=DF, n-1)
-    "STDERR": lambda x: x.sem(),      # standard error of the mean
-    "VAR":    lambda x: x.var(),      # sample variance (VARDEF=DF, n-1)
+    "SUM": lambda x: x.sum(),
+    "MEAN": lambda x: x.mean(),
+    "MIN": lambda x: x.min(),
+    "MAX": lambda x: x.max(),
+    "STD": lambda x: x.std(),  # sample std dev (VARDEF=DF, n-1)
+    "STDERR": lambda x: x.sem(),  # standard error of the mean
+    "VAR": lambda x: x.var(),  # sample variance (VARDEF=DF, n-1)
     "MEDIAN": lambda x: x.median(),
-    "P1":     lambda x: x.quantile(0.01),
-    "P5":     lambda x: x.quantile(0.05),
-    "P10":    lambda x: x.quantile(0.10),
-    "P25":    lambda x: x.quantile(0.25),
-    "P75":    lambda x: x.quantile(0.75),
-    "P90":    lambda x: x.quantile(0.90),
-    "P95":    lambda x: x.quantile(0.95),
-    "P99":    lambda x: x.quantile(0.99),
+    "P1": lambda x: x.quantile(0.01),
+    "P5": lambda x: x.quantile(0.05),
+    "P10": lambda x: x.quantile(0.10),
+    "P25": lambda x: x.quantile(0.25),
+    "P75": lambda x: x.quantile(0.75),
+    "P90": lambda x: x.quantile(0.90),
+    "P95": lambda x: x.quantile(0.95),
+    "P99": lambda x: x.quantile(0.99),
     "QRANGE": lambda x: x.quantile(0.75) - x.quantile(0.25),
-    "GMEAN":  lambda x: np.exp(np.log(x[x > 0]).mean()) if (x > 0).any() else np.nan,
-    "HMEAN":  lambda x: _hmean(x),
+    "GMEAN": lambda x: np.exp(np.log(x[x > 0]).mean()) if (x > 0).any() else np.nan,
+    "HMEAN": lambda x: _hmean(x),
 }
 
 # ---------------------------------------------------------------------------
@@ -282,9 +283,9 @@ _BASE_STATS: dict[str, Callable] = {
 # This cleaning step is applied once in _clean_weights() before any of the
 # functions below are called.
 
+
 def _drop_nan_x(x, w):
-    """
-    Drop rows where the measure value x is NaN, keeping x and w aligned.
+    """Drop rows where the measure value x is NaN, keeping x and w aligned.
 
     This must happen before any weighted-stat formula runs: pandas .sum()
     silently skips NaN in the NUMERATOR (x*w), but the weight itself is a
@@ -296,11 +297,13 @@ def _drop_nan_x(x, w):
     mask = x.notna()
     return x[mask], w[mask]
 
+
 def _wmean(x, w):
     # Weighted arithmetic mean: x_bar_w = (sum w*x) / (sum w)
     x, w = _drop_nan_x(x, w)
     wsum = w.sum()
     return (x * w).sum() / wsum if wsum else np.nan
+
 
 def _wvar(x, w):
     # Weighted variance, UNBIASED (reliability-weights) estimator:
@@ -311,7 +314,7 @@ def _wvar(x, w):
     wsum = w.sum()
     if not wsum:
         return np.nan
-    denom = wsum ** 2 - (w ** 2).sum()
+    denom = wsum**2 - (w**2).sum()
     if denom <= 0:
         # Degenerate case (e.g. a single nonzero-weight observation):
         # not enough effective degrees of freedom to estimate variance.
@@ -320,9 +323,11 @@ def _wvar(x, w):
     numerator = (w * (x - xbar) ** 2).sum()
     return (wsum / denom) * numerator
 
+
 def _wstd(x, w):
     v = _wvar(x, w)
     return np.sqrt(v) if pd.notna(v) else np.nan
+
 
 def _wstderr(x, w):
     # Standard error of the weighted mean: SD_w / sqrt(sum w)
@@ -330,6 +335,7 @@ def _wstderr(x, w):
     v = _wvar(x, w)
     wsum = w.sum()
     return np.sqrt(v / wsum) if pd.notna(v) and wsum else np.nan
+
 
 def _wpercentile(x, w, q):
     """Weighted percentile via linear interpolation on the weighted ECDF."""
@@ -345,6 +351,7 @@ def _wpercentile(x, w, q):
     idx = min(idx, len(xs) - 1)
     return xs[idx]
 
+
 def _wgmean(x, w):
     # Weighted geometric mean: exp( (sum w*ln x) / (sum w) )
     x, w = _drop_nan_x(x, w)
@@ -356,6 +363,7 @@ def _wgmean(x, w):
     if not wsum:
         return np.nan
     return np.exp((ww * np.log(xw)).sum() / wsum)
+
 
 def _whmean(x, w):
     # Weighted harmonic mean: (sum w) / (sum w/x)
@@ -369,47 +377,52 @@ def _whmean(x, w):
         return np.nan
     return wsum / (ww / xw).sum()
 
+
 _WEIGHTED_STATS: dict[str, Callable] = {
-    "N":      lambda x, w: x.count(),   # alias for COUNT, NEVER weighted
-    "COUNT":  lambda x, w: x.count(),   # NEVER weighted - plain count of non-missing values
-    "SIZE":   lambda x, w: x.size,      # NEVER weighted - plain count of ALL rows
-    "NMISS":  lambda x, w: x.isna().sum(),  # also never weighted - plain count
-    "SUM":    lambda x, w: (x * w).sum(),
-    "MEAN":   _wmean,
-    "MIN":    lambda x, w: x.min(),
-    "MAX":    lambda x, w: x.max(),
-    "STD":    _wstd,
+    "N": lambda x, w: x.count(),  # alias for COUNT, NEVER weighted
+    "COUNT": lambda x, w: x.count(),  # NEVER weighted - plain count of non-missing values
+    "SIZE": lambda x, w: x.size,  # NEVER weighted - plain count of ALL rows
+    "NMISS": lambda x, w: x.isna().sum(),  # also never weighted - plain count
+    "SUM": lambda x, w: (x * w).sum(),
+    "MEAN": _wmean,
+    "MIN": lambda x, w: x.min(),
+    "MAX": lambda x, w: x.max(),
+    "STD": _wstd,
     "STDERR": _wstderr,
-    "VAR":    _wvar,
+    "VAR": _wvar,
     "MEDIAN": lambda x, w: _wpercentile(x, w, 0.50),
-    "P1":     lambda x, w: _wpercentile(x, w, 0.01),
-    "P5":     lambda x, w: _wpercentile(x, w, 0.05),
-    "P10":    lambda x, w: _wpercentile(x, w, 0.10),
-    "P25":    lambda x, w: _wpercentile(x, w, 0.25),
-    "P75":    lambda x, w: _wpercentile(x, w, 0.75),
-    "P90":    lambda x, w: _wpercentile(x, w, 0.90),
-    "P95":    lambda x, w: _wpercentile(x, w, 0.95),
-    "P99":    lambda x, w: _wpercentile(x, w, 0.99),
+    "P1": lambda x, w: _wpercentile(x, w, 0.01),
+    "P5": lambda x, w: _wpercentile(x, w, 0.05),
+    "P10": lambda x, w: _wpercentile(x, w, 0.10),
+    "P25": lambda x, w: _wpercentile(x, w, 0.25),
+    "P75": lambda x, w: _wpercentile(x, w, 0.75),
+    "P90": lambda x, w: _wpercentile(x, w, 0.90),
+    "P95": lambda x, w: _wpercentile(x, w, 0.95),
+    "P99": lambda x, w: _wpercentile(x, w, 0.99),
     "QRANGE": lambda x, w: _wpercentile(x, w, 0.75) - _wpercentile(x, w, 0.25),
-    "GMEAN":  _wgmean,
-    "HMEAN":  _whmean,
+    "GMEAN": _wgmean,
+    "HMEAN": _whmean,
 }
 
 
 def _clean_weights(weights: pd.Series) -> pd.Series:
-    """
-    Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column:
-      - missing weight  -> NaN (caller must drop these rows entirely)
-      - negative weight -> treated as 0 (observation still counted in N)
-      - zero / positive -> unchanged
+    """Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column:
+    - missing weight  -> NaN (caller must drop these rows entirely)
+    - negative weight -> treated as 0 (observation still counted in N)
+    - zero / positive -> unchanged
     """
     cleaned = weights.copy()
     cleaned[cleaned < 0] = 0
     return cleaned
 
+
 _PERCENT_STATS = {
-    "PCTN", "ROWPCTN", "COLPCTN",
-    "PCTSUM", "ROWPCTSUM", "COLPCTSUM",
+    "PCTN",
+    "ROWPCTN",
+    "COLPCTN",
+    "PCTSUM",
+    "ROWPCTSUM",
+    "COLPCTSUM",
 }
 
 ALL_STATS = set(_BASE_STATS) | _PERCENT_STATS
@@ -419,9 +432,9 @@ ALL_STATS = set(_BASE_STATS) | _PERCENT_STATS
 # 3. TOKENIZER
 # ---------------------------------------------------------------------------
 
+
 def _tokenize(expr: str) -> list[tuple]:
-    """
-    Tokenize a single TABLE dimension expression into a flat list of tokens.
+    """Tokenize a single TABLE dimension expression into a flat list of tokens.
 
     Token types emitted:
       ('NAME', name, label)     a variable or keyword name; label is the
@@ -444,14 +457,14 @@ def _tokenize(expr: str) -> list[tuple]:
         # format=7.2[_|s]  -> decimal point, 2 decimals
         # format=7,2[_|s]  -> decimal comma,  2 decimals
         # trailing _ or s  -> thousands separator (comma/dot or space)
-        r'(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)'
+        r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)"
         # denominator definition: <token1 token2 ...>
-        r'|(?P<denom><[^>]*>)'
-        r'|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*'
+        r"|(?P<denom><[^>]*>)"
+        r"|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*"
         r'(?:"(?P<dq_label>[^"]*)"|\'(?P<sq_label>[^\']*)\')'
-        r'|(?P<name>[A-Za-z_][A-Za-z0-9_%]*)'
-        r'|(?P<op>[*()])'
-        r'|(?P<space>\s+)',
+        r"|(?P<name>[A-Za-z_][A-Za-z0-9_%]*)"
+        r"|(?P<op>[*()])"
+        r"|(?P<space>\s+)",
     )
     tokens = []
     for m in pattern.finditer(expr):
@@ -462,7 +475,11 @@ def _tokenize(expr: str) -> list[tuple]:
             inner = m.group("denom")[1:-1].strip()
             tokens.append(("DENOM", inner))
         elif m.group("labeled"):
-            label = m.group("dq_label") if m.group("dq_label") is not None else m.group("sq_label")
+            label = (
+                m.group("dq_label")
+                if m.group("dq_label") is not None
+                else m.group("sq_label")
+            )
             tokens.append(("NAME", m.group("labeled"), label))
         elif m.group("name"):
             tokens.append(("NAME", m.group("name"), None))
@@ -486,12 +503,12 @@ def _tokenize(expr: str) -> list[tuple]:
 # 4. AST NODE
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DimNode:
-    """
-    A node in the parsed TABLE expression tree.
+    """A node in the parsed TABLE expression tree.
 
-    Attributes
+    Attributes:
     ----------
     kind : str
         One of:
@@ -523,12 +540,13 @@ class DimNode:
     children : list of DimNode
         Sub-nodes for cross/concat/group kinds.
     """
+
     kind: str
-    name: Optional[str] = None
-    label: Optional[str] = None
-    fmt:   Optional[str] = None
-    denom: Optional[str] = None
-    children: list["DimNode"] = field(default_factory=list)
+    name: str | None = None
+    label: str | None = None
+    fmt: str | None = None
+    denom: str | None = None
+    children: list[DimNode] = field(default_factory=list)
 
     def display_label(self) -> str:
         if self.label is None:
@@ -552,6 +570,7 @@ class DimNode:
 # 5. RECURSIVE-DESCENT PARSER
 # ---------------------------------------------------------------------------
 
+
 class _Parser:
     def __init__(self, tokens: list[tuple]):
         self.tokens = tokens
@@ -561,7 +580,7 @@ class _Parser:
         while self.pos < len(self.tokens) and self.tokens[self.pos][0] == "SP":
             self.pos += 1
 
-    def peek(self) -> Optional[tuple]:
+    def peek(self) -> tuple | None:
         p = self.pos
         while p < len(self.tokens) and self.tokens[p][0] == "SP":
             p += 1
@@ -619,8 +638,7 @@ class _Parser:
         return nodes[0] if len(nodes) == 1 else DimNode(kind="cross", children=nodes)
 
     def _apply_fmt(self, node: DimNode, fmt_spec: str):
-        """
-        Apply a format= spec to a node.
+        """Apply a format= spec to a node.
 
         For a leaf node (var/all), the format is set directly on it - this
         is the simple "mean*format=7,1" case.
@@ -661,16 +679,19 @@ class _Parser:
             name_upper = t[1].upper()
             label = t[2]
             # Consume an immediately following FMT token if present
-            fmt   = self._consume_fmt()
+            fmt = self._consume_fmt()
             denom = self._consume_denom()
             if name_upper in ("ALL", "TOTAL"):
-                return DimNode(kind="all", name="ALL", label=label, fmt=fmt, denom=denom)
+                return DimNode(
+                    kind="all", name="ALL", label=label, fmt=fmt, denom=denom
+                )
             return DimNode(kind="var", name=t[1], label=label, fmt=fmt, denom=denom)
         raise SyntaxError(f"Unexpected token: {t}")
 
-    def _consume_fmt(self) -> Optional[str]:
+    def _consume_fmt(self) -> str | None:
         """Consume and return a FMT token immediately following the current
-        position (skipping a single space), or return None."""
+        position (skipping a single space), or return None.
+        """
         p = self.pos
         # Allow one optional space between token and format=
         if p < len(self.tokens) and self.tokens[p][0] == "SP":
@@ -680,9 +701,10 @@ class _Parser:
             return self.tokens[p][1]
         return None
 
-    def _consume_denom(self) -> Optional[str]:
+    def _consume_denom(self) -> str | None:
         """Consume and return a DENOM token (e.g. the 'income' from
-        pctsum<income>) immediately after the current position, or None."""
+        pctsum<income>) immediately after the current position, or None.
+        """
         p = self.pos
         if p < len(self.tokens) and self.tokens[p][0] == "SP":
             p += 1
@@ -693,8 +715,7 @@ class _Parser:
 
 
 def _split_dimensions(expr: str) -> list[str]:
-    """
-    Split on top-level commas (not inside parentheses or quoted strings).
+    """Split on top-level commas (not inside parentheses or quoted strings).
 
     A comma that is the DECIMAL SEPARATOR in a format=W,D[_|s] spec
     (immediately following the width digits of "format=", e.g.
@@ -725,7 +746,7 @@ def _split_dimensions(expr: str) -> list[str]:
         elif ch == "," and depth == 0:
             # Check if this comma is the decimal separator in "format=<digits>,"
             so_far = "".join(current)
-            if re.search(r'format\s*=\s*[0-9]+$', so_far):
+            if re.search(r"format\s*=\s*[0-9]+$", so_far):
                 current.append(ch)  # decimal comma in format=W,D — not a separator
             else:
                 parts.append("".join(current))
@@ -741,7 +762,9 @@ def _split_dimensions(expr: str) -> list[str]:
 def parse_table(table_str: str) -> tuple:
     dims = _split_dimensions(table_str)
     if len(dims) > 2:
-        raise ValueError("TABLE supports at most 2 dimensions (row, col). The page dimension is not supported.")
+        raise ValueError(
+            "TABLE supports at most 2 dimensions (row, col). The page dimension is not supported."
+        )
     result = []
     for dim in dims:
         tokens = _tokenize(dim.strip())
@@ -753,8 +776,10 @@ def parse_table(table_str: str) -> tuple:
 # 6. PATH EXPANSION
 # ---------------------------------------------------------------------------
 
+
 def _expand_node(node: DimNode) -> list[list[DimNode]]:
     from itertools import product as iproduct
+
     if node.kind in ("var", "all"):
         return [[node]]
     if node.kind == "group":
@@ -774,8 +799,7 @@ def _expand_node(node: DimNode) -> list[list[DimNode]]:
 
 
 def _expand_node_with_branch(node: DimNode):
-    """
-    Like _expand_node, but additionally returns a top-level branch index for
+    """Like _expand_node, but additionally returns a top-level branch index for
     each path, used to order specs that come from a TOP-LEVEL concatenation
     (space-separated dimension root) in written left-to-right order.
 
@@ -805,33 +829,34 @@ def _expand_node_with_branch(node: DimNode):
 # 7. PATH CLASSIFICATION
 # ---------------------------------------------------------------------------
 
+
 def _classify_path(path, measure_list, groupby_list):
     measure_map = {m.upper(): m for m in measure_list}
     groupby_map = {g.upper(): g for g in groupby_list}
 
     group_keys = []
-    var        = None
-    var_label  = None
-    stat       = None
+    var = None
+    var_label = None
+    stat = None
     stat_label = None
-    has_all    = False
-    all_label  = None
+    has_all = False
+    all_label = None
 
     for node in path:
         upper = node.name.upper() if node.name else ""
         if node.kind == "all":
-            has_all   = True
+            has_all = True
             all_label = node.label
         elif upper in groupby_map:
             orig = groupby_map[upper]
-            lbl  = node.label if node.label is not None else orig
+            lbl = node.label if node.label is not None else orig
             group_keys.append((orig, lbl))
         elif upper in measure_map:
-            orig      = measure_map[upper]
-            var       = orig
+            orig = measure_map[upper]
+            var = orig
             var_label = node.label if node.label is not None else orig
         elif upper in ALL_STATS:
-            stat       = upper
+            stat = upper
             stat_label = node.label if node.label is not None else upper
         else:
             raise ValueError(
@@ -845,7 +870,9 @@ def _classify_path(path, measure_list, groupby_list):
     for node in path:
         upper = node.name.upper() if node.name else ""
         if node.kind == "all":
-            path_order.append(("all", node.label if node.label is not None else "TOTAL", None))
+            path_order.append(
+                ("all", node.label if node.label is not None else "TOTAL", None)
+            )
         elif upper in groupby_map:
             orig_name = groupby_map[upper]
             lbl = node.label if node.label is not None else orig_name
@@ -875,15 +902,15 @@ def _classify_path(path, measure_list, groupby_list):
 
     return {
         "group_keys": group_keys,
-        "var":        var,
-        "var_label":  var_label,
-        "stat":       stat,
+        "var": var,
+        "var_label": var_label,
+        "stat": stat,
         "stat_label": stat_label,
-        "has_all":    has_all,
-        "all_label":  all_label,
+        "has_all": has_all,
+        "all_label": all_label,
         "path_order": path_order,
-        "fmt":        fmt,
-        "denom_def":  denom_def,
+        "fmt": fmt,
+        "denom_def": denom_def,
     }
 
 
@@ -891,9 +918,11 @@ def _classify_path(path, measure_list, groupby_list):
 # 8. AGGREGATION
 # ---------------------------------------------------------------------------
 
-def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, weight=None):
-    """
-    Compute an aggregated Series for a single (row_spec, col_spec) pair
+
+def _compute_series(
+    data, all_groups, var, stat, r_groups, c_groups, missing, weight=None
+):
+    """Compute an aggregated Series for a single (row_spec, col_spec) pair
     when neither spec carries an ALL/TOTAL token — i.e. both dimensions
     are pure groupby-value breakdowns with no marginal totals.
 
@@ -908,11 +937,11 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
     missing    : passed as dropna=not-missing to groupby
     weight     : optional weight column name
 
-    Returns
+    Returns:
     -------
     pd.Series  indexed by the all_groups groupby key(s)
 
-    Notes
+    Notes:
     -----
     Percentage stats (PCTN, PCTSUM, ROWPCTN, COLPCTN, ROWPCTSUM,
     COLPCTSUM) route through this function. Their denominator is
@@ -939,8 +968,10 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         if var is not None:
             if weight is not None and wfunc is not None:
                 cols = [var, weight]
+
                 def _apply(g):
                     return wfunc(g[var], g[weight])
+
                 if groups:
                     return data.groupby(groups, dropna=dropna)[cols].apply(_apply)
                 return pd.Series({"__total__": _apply(data[cols])})
@@ -974,7 +1005,7 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
                 f"missing values OF a measure column, so it always needs "
                 f"one, e.g. income*NMISS."
             )
-        func  = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
+        func = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
         wfunc = _WEIGHTED_STATS.get(stat) if var is not None else None
         return _agg(all_groups, func, wfunc)
 
@@ -987,14 +1018,14 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         )
 
     if count_based:
-        raw_func  = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
+        raw_func = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
         raw_wfunc = _WEIGHTED_STATS["N"] if var is not None else None
     else:
-        raw_func  = _BASE_STATS["SUM"]
+        raw_func = _BASE_STATS["SUM"]
         raw_wfunc = _WEIGHTED_STATS["SUM"]
 
     series = _agg(all_groups, raw_func, raw_wfunc)
-    grand  = _grand(raw_func if var is not None else (lambda x: len(x)), raw_wfunc)
+    grand = _grand(raw_func if var is not None else (lambda x: len(x)), raw_wfunc)
 
     if stat in ("PCTN", "PCTSUM"):
         return 100.0 * series / grand
@@ -1003,11 +1034,13 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         if r_groups:
             denom = _agg(r_groups, raw_func, raw_wfunc)
             n_r = len(r_groups)
+
             def row_pct(val, idx):
                 key = idx[:n_r] if isinstance(idx, tuple) else (idx,)
                 key = key[0] if len(key) == 1 else key
                 d = denom.get(key, np.nan)
                 return 100.0 * val / d if d else np.nan
+
             return pd.Series(
                 {idx: row_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
@@ -1018,14 +1051,16 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         if c_groups:
             denom = _agg(c_groups, raw_func, raw_wfunc)
             n_r = len(r_groups)
+
             def col_pct(val, idx):
                 if isinstance(idx, tuple):
-                    key = idx[n_r:n_r + len(c_groups)]
+                    key = idx[n_r : n_r + len(c_groups)]
                 else:
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
                 d = denom.get(key, np.nan)
                 return 100.0 * val / d if d else np.nan
+
             return pd.Series(
                 {idx: col_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
@@ -1039,10 +1074,11 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
 # 9. ALL (MARGINAL TOTAL) COMPUTATION
 # ---------------------------------------------------------------------------
 
-def _compute_all_series(data, groups_to_keep, var, stat, missing,
-                        r_groups=None, c_groups=None, weight=None):
-    """
-    Compute an aggregated Series for a spec that involves an ALL/TOTAL
+
+def _compute_all_series(
+    data, groups_to_keep, var, stat, missing, r_groups=None, c_groups=None, weight=None
+):
+    """Compute an aggregated Series for a spec that involves an ALL/TOTAL
     marginal total in at least one dimension.
 
     This handles the three ALL cases:
@@ -1065,7 +1101,7 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
     c_groups       : col-dimension groupby columns (for ROWPCTN denominator)
     weight         : optional weight column name
 
-    Notes
+    Notes:
     -----
     For COLPCTN/COLPCTSUM: denominator = column total (grouped by c_groups).
     For ROWPCTN/ROWPCTSUM: denominator = row total   (grouped by r_groups).
@@ -1088,8 +1124,10 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         if var is not None:
             if weight is not None and wfunc is not None:
                 cols = [var, weight]
+
                 def _apply(g):
                     return wfunc(g[var], g[weight])
+
                 if groups:
                     return data.groupby(groups, dropna=dropna)[cols].apply(_apply)
                 return pd.Series({"__total__": _apply(data[cols])})
@@ -1112,7 +1150,7 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
                 f"missing values OF a measure column, so it always needs "
                 f"one, e.g. income*NMISS."
             )
-        func  = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
+        func = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
         wfunc = _WEIGHTED_STATS.get(stat) if var is not None else None
         return _agg(groups_to_keep, wfunc)
 
@@ -1125,15 +1163,19 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         )
 
     if count_based:
-        raw_func  = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
+        raw_func = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
         raw_wfunc = _WEIGHTED_STATS["N"] if var is not None else None
         # N/NMISS-based grand total is ALWAYS a plain row count, never
         # weighted - even when weight= is supplied and var is set.
         grand = data[var].count() if var is not None else len(data)
     else:
-        raw_func  = _BASE_STATS["SUM"]
+        raw_func = _BASE_STATS["SUM"]
         raw_wfunc = _WEIGHTED_STATS["SUM"]
-        grand = raw_wfunc(data[var], data[weight]) if weight is not None else data[var].sum()
+        grand = (
+            raw_wfunc(data[var], data[weight])
+            if weight is not None
+            else data[var].sum()
+        )
 
     func = raw_func  # used inside _agg's non-weighted branch
 
@@ -1145,6 +1187,7 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         # Divide each cell by the total for its column group.
         if c_groups:
             denom = _agg(c_groups, raw_wfunc)  # total per column group
+
             def _col_denom(idx):
                 # idx is from groups_to_keep = r_context + c_groups
                 # c_groups part starts after r_context groups
@@ -1155,17 +1198,18 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
                 return denom.get(key, np.nan)
+
             def _safe_pct(val, denom_val):
                 if denom_val is np.nan or denom_val == 0:
                     return np.nan
                 return 100.0 * val / denom_val
+
             return pd.Series(
-                {idx: _safe_pct(val, _col_denom(idx))
-                 for idx, val in series.items()},
+                {idx: _safe_pct(val, _col_denom(idx)) for idx, val in series.items()},
                 name=series.name,
             )
         # No column groups — divide by overall grand total
-        with np.errstate(invalid='ignore', divide='ignore'):
+        with np.errstate(invalid="ignore", divide="ignore"):
             return 100.0 * series / grand
 
     if stat in ("ROWPCTN", "ROWPCTSUM"):
@@ -1173,24 +1217,29 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         # When ALL is on cols, r_groups are the row breakdown groups.
         if r_groups:
             denom = _agg(r_groups, raw_wfunc)  # total per row group
+
             def _row_denom(idx):
                 n_c_ctx = len(groups_to_keep) - len(r_groups)
                 if isinstance(idx, tuple):
-                    key = idx[:len(r_groups)]
+                    key = idx[: len(r_groups)]
                 else:
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
                 return denom.get(key, np.nan)
+
             def _safe_row_pct(val, denom_val):
                 if denom_val is np.nan or denom_val == 0:
                     return np.nan
                 return 100.0 * val / denom_val
+
             return pd.Series(
-                {idx: _safe_row_pct(val, _row_denom(idx))
-                 for idx, val in series.items()},
+                {
+                    idx: _safe_row_pct(val, _row_denom(idx))
+                    for idx, val in series.items()
+                },
                 name=series.name,
             )
-        with np.errstate(invalid='ignore', divide='ignore'):
+        with np.errstate(invalid="ignore", divide="ignore"):
             return 100.0 * series / grand
 
     # PCTN / PCTSUM: always use overall grand total
@@ -1201,9 +1250,9 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
 # 10. CUSTOM DENOMINATOR PERCENTAGE COMPUTATION
 # ---------------------------------------------------------------------------
 
+
 def _parse_denom_def(denom_str: str) -> list[str]:
-    """
-    Parse the content of a <...> denominator definition into an ordered
+    """Parse the content of a <...> denominator definition into an ordered
     list of uppercase token strings.
 
     Each token is one of:
@@ -1216,7 +1265,7 @@ def _parse_denom_def(denom_str: str) -> list[str]:
     denominator.  Placing ALL/TOTAL last provides a fallback for cells where
     none of the named variables participate.
 
-    Examples
+    Examples:
     --------
     'income'       -> ['INCOME']
     'gender all'   -> ['GENDER', 'ALL']
@@ -1239,8 +1288,7 @@ def _compute_custom_pct(
     r_path_order: list = None,
     c_path_order: list = None,
 ) -> pd.Series:
-    """
-    Compute a percentage statistic with a user-defined denominator.
+    """Compute a percentage statistic with a user-defined denominator.
 
     This implements the PCTN<...> and PCTSUM<...> syntax, where the content
     of <...> specifies what the denominator should be.
@@ -1268,7 +1316,7 @@ def _compute_custom_pct(
       - If no matching token is found, fall back left-to-right through the
         token list as before, or to grand total as a final fallback.
 
-    Examples
+    Examples:
     --------
     pctn<total gender age_group>  with row spec origin*(Total gender age_group):
       Total row  -> innermost=all  -> token 'total' -> grand total denom
@@ -1278,14 +1326,14 @@ def _compute_custom_pct(
     pctsum<income>  (ratio of two measures, same groups always)
     pctn<gender all>  (gender subtotal, fallback to grand total)
     """
-    measure_upper  = [m.upper() for m in (measure or [])]
-    groupby_upper  = [g.upper() for g in (groupby  or [])]
-    groupby_map    = {g.upper(): g for g in (groupby or [])}
-    measure_map    = {m.upper(): m for m in (measure or [])}
+    measure_upper = [m.upper() for m in (measure or [])]
+    groupby_upper = [g.upper() for g in (groupby or [])]
+    groupby_map = {g.upper(): g for g in (groupby or [])}
+    measure_map = {m.upper(): m for m in (measure or [])}
 
     denom_tokens = _parse_denom_def(denom_def)
-    all_groups   = list(dict.fromkeys(r_groups + c_groups))
-    dropna       = not missing
+    all_groups = list(dict.fromkeys(r_groups + c_groups))
+    dropna = not missing
 
     def _agg_series(groups, var_col):
         if var_col is not None:
@@ -1296,10 +1344,14 @@ def _compute_custom_pct(
                 d[weight] = _clean_weights(d[weight])
                 d = d.dropna(subset=[var_col])
                 if groups:
-                    return (d.groupby(groups, dropna=dropna)
-                              .apply(lambda g: (g[var_col] * g[weight]).sum(),
-                                     include_groups=False)
-                              .rename(None))
+                    return (
+                        d.groupby(groups, dropna=dropna)
+                        .apply(
+                            lambda g: (g[var_col] * g[weight]).sum(),
+                            include_groups=False,
+                        )
+                        .rename(None)
+                    )
                 return pd.Series({"__total__": (d[var_col] * d[weight]).sum()})
             else:
                 if groups:
@@ -1311,11 +1363,15 @@ def _compute_custom_pct(
             return pd.Series({"__total__": len(data)})
 
     def _norm_for_lookup(v):
-        if v is None: return "__nan__"
+        if v is None:
+            return "__nan__"
         try:
-            if isinstance(v, float) and np.isnan(v): return "__nan__"
-        except (TypeError, ValueError): pass
-        if v is pd.NA or v is pd.NaT: return "__nan__"
+            if isinstance(v, float) and np.isnan(v):
+                return "__nan__"
+        except (TypeError, ValueError):
+            pass
+        if v is pd.NA or v is pd.NaT:
+            return "__nan__"
         return v
 
     def _norm_lookup_key(k):
@@ -1327,8 +1383,8 @@ def _compute_custom_pct(
     # We look at r_path_order and c_path_order combined, taking the last entry
     # that is either 'group' (a real groupby column) or 'all' (a Total row).
     combined_po = list(r_path_order or []) + list(c_path_order or [])
-    innermost_kind    = None   # 'group' or 'all'
-    innermost_orig    = None   # original column name for 'group', None for 'all'
+    innermost_kind = None  # 'group' or 'all'
+    innermost_orig = None  # original column name for 'group', None for 'all'
 
     for entry in reversed(combined_po):
         kind = entry[0]
@@ -1347,14 +1403,14 @@ def _compute_custom_pct(
     #     or fall back to grand total
     #   - 'group' innermost with orig_col X: find the token matching X and
     #     collapse X from all_groups to get the parent subtotal
-    denom_var_col = var   # default: same measure as numerator
-    denom_groups  = []    # default: grand total
+    denom_var_col = var  # default: same measure as numerator
+    denom_groups = []  # default: grand total
 
     # First check if any token is a measure name (always takes priority)
     measure_tok = next((t for t in denom_tokens if t in measure_upper), None)
     if measure_tok is not None:
         denom_var_col = measure_map[measure_tok]
-        denom_groups  = all_groups
+        denom_groups = all_groups
 
     elif innermost_kind == "group" and innermost_orig is not None:
         # This spec produces rows broken down by innermost_orig.
@@ -1362,18 +1418,18 @@ def _compute_custom_pct(
         inner_upper = innermost_orig.upper()
         if inner_upper in denom_tokens and inner_upper in groupby_upper:
             # Collapse innermost_orig: denominator = subtotal excluding this var
-            denom_groups  = [g for g in all_groups if g != innermost_orig]
+            denom_groups = [g for g in all_groups if g != innermost_orig]
             denom_var_col = var
         else:
             # Token not found for this variable; try left-to-right as fallback
             for tok in denom_tokens:
                 if tok in groupby_upper:
                     col = groupby_map[tok]
-                    denom_groups  = [g for g in all_groups if g != col]
+                    denom_groups = [g for g in all_groups if g != col]
                     denom_var_col = var
                     break
                 elif tok in ("ALL", "TOTAL"):
-                    denom_groups  = []
+                    denom_groups = []
                     denom_var_col = var
                     break
 
@@ -1384,7 +1440,7 @@ def _compute_custom_pct(
         found = False
         for tok in denom_tokens:
             if tok in ("ALL", "TOTAL"):
-                denom_groups  = []
+                denom_groups = []
                 denom_var_col = var
                 found = True
                 break
@@ -1393,7 +1449,7 @@ def _compute_custom_pct(
             for tok in denom_tokens:
                 if tok in groupby_upper:
                     col = groupby_map[tok]
-                    denom_groups  = [g for g in all_groups if g != col]
+                    denom_groups = [g for g in all_groups if g != col]
                     denom_var_col = var
                     break
 
@@ -1402,20 +1458,20 @@ def _compute_custom_pct(
         for tok in denom_tokens:
             if tok in measure_upper:
                 denom_var_col = measure_map[tok]
-                denom_groups  = all_groups
+                denom_groups = all_groups
                 break
             elif tok in groupby_upper:
                 col = groupby_map[tok]
-                denom_groups  = [g for g in all_groups if g != col]
+                denom_groups = [g for g in all_groups if g != col]
                 denom_var_col = var
                 break
             elif tok in ("ALL", "TOTAL"):
-                denom_groups  = []
+                denom_groups = []
                 denom_var_col = var
                 break
 
     # Compute numerator and denominator series
-    num_series   = _agg_series(all_groups,   var)
+    num_series = _agg_series(all_groups, var)
     denom_series = _agg_series(denom_groups, denom_var_col)
 
     # Build normalised-key lookup so NaN groupby values match correctly
@@ -1459,20 +1515,19 @@ _SENTINEL = "__total__"
 
 def flextab(
     data: pd.DataFrame,
-    measure: "str | list" = None,
-    groupby: "str | list" = None,
+    measure: str | list = None,
+    groupby: str | list = None,
     table: str = None,
     include_missing_in_groupby: bool = True,
     fmt: str = "{:.1f}",
     na_rep: str = None,
     labels: dict = None,
-    sort_by: str = 'code',
+    sort_by: str = "code",
     weight: str = None,
     row_header: str = None,
     style: dict = None,
 ) -> pd.DataFrame:
-    """
-    Build a cross-tabulation table, equivalent to SAS PROC TABULATE.
+    """Build a cross-tabulation table, equivalent to SAS PROC TABULATE.
 
     Returns a FlextabResult — a pd.DataFrame subclass that keeps the
     underlying values numeric (for further computation or export) but
@@ -1524,7 +1579,7 @@ def flextab(
             ALL or TOTAL -> grand total
           Multiple tokens: first one that applies to the subtable is used.
 
-          Examples:
+    Examples:
             tax*pctsum<income>           tax as % of income
             income*pctsum<gender all>    % of gender subtotal; ALL fallback
             pctn<origin all>             count % of origin subtotal
@@ -1623,7 +1678,7 @@ def flextab(
                 'cell_bg': ('white', '#EBF3FB'),  # row0=white, row1=pale blue
             }
 
-    Returns
+    Returns:
     -------
     FlextabResult
         A pd.DataFrame subclass.  Numeric values are preserved for
@@ -1646,7 +1701,7 @@ def flextab(
     measure = measure or []
     groupby = groupby or []
     missing = include_missing_in_groupby
-    labels  = labels  or {}
+    labels = labels or {}
     # Flat lookup: original_value -> display_label for any groupby column.
     # Used by _fmt_val inside _key_to_label to remap codes to labels.
     _label_map = labels  # kept separate so groupby always uses original codes
@@ -1674,10 +1729,19 @@ def flextab(
 
     def expand_dim(dim_node):
         if dim_node is None:
-            return [{"group_keys": [], "var": None, "var_label": None,
-                     "stat": None, "stat_label": None,
-                     "has_all": False, "all_label": None,
-                     "path_order": [], "branch": 0}]
+            return [
+                {
+                    "group_keys": [],
+                    "var": None,
+                    "var_label": None,
+                    "stat": None,
+                    "stat_label": None,
+                    "has_all": False,
+                    "all_label": None,
+                    "path_order": [],
+                    "branch": 0,
+                }
+            ]
         specs = []
         for branch_idx, path in _expand_node_with_branch(dim_node):
             spec = _classify_path(path, measure, groupby)
@@ -1700,12 +1764,14 @@ def flextab(
         # it does not affect what gets displayed in the table header.
         parts = []
         for entry in spec["path_order"]:
-            label    = entry[1]
-            orig     = entry[2] if len(entry) > 2 else None
+            label = entry[1]
+            orig = entry[2] if len(entry) > 2 else None
             is_group = entry[0] == "group"
             if is_group and not label and orig:
                 # Blank label on a group token → use orig_name internally
-                parts.append(f"\x00{orig}")  # prefix ensures no collision with real labels
+                parts.append(
+                    f"\x00{orig}"
+                )  # prefix ensures no collision with real labels
             else:
                 parts.append(label)
         return tuple(parts) if parts else ("",)
@@ -1718,16 +1784,16 @@ def flextab(
     col_hdr_path: dict = {}
 
     for r_spec in row_specs:
-        r_hdr    = spec_header(r_spec)
+        r_hdr = spec_header(r_spec)
         r_groups = orig_groups(r_spec)
         row_hdr_path.setdefault(r_hdr, (r_spec["path_order"], r_spec["branch"]))
 
         for c_spec in col_specs:
-            c_hdr    = spec_header(c_spec)
+            c_hdr = spec_header(c_spec)
             c_groups = orig_groups(c_spec)
             col_hdr_path.setdefault(c_hdr, (c_spec["path_order"], c_spec["branch"]))
 
-            var  = r_spec["var"]  or c_spec["var"]
+            var = r_spec["var"] or c_spec["var"]
             stat = r_spec["stat"] or c_spec["stat"]
 
             if stat is None:
@@ -1761,38 +1827,64 @@ def flextab(
 
             elif not has_all_r and not has_all_c:
                 series = _compute_series(
-                    data, all_groups, var, stat, r_groups, c_groups, missing,
-                    weight=weight
+                    data,
+                    all_groups,
+                    var,
+                    stat,
+                    r_groups,
+                    c_groups,
+                    missing,
+                    weight=weight,
                 )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
             elif has_all_r and not has_all_c:
                 # ALL on rows: c_groups drive the column denominator for COLPCTN
                 keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(data, keep, var, stat, missing,
-                                             r_groups=r_groups, c_groups=c_groups,
-                                             weight=weight)
+                series = _compute_all_series(
+                    data,
+                    keep,
+                    var,
+                    stat,
+                    missing,
+                    r_groups=r_groups,
+                    c_groups=c_groups,
+                    weight=weight,
+                )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
             elif not has_all_r and has_all_c:
                 # ALL on cols: r_groups drive the row denominator for ROWPCTN
                 keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(data, keep, var, stat, missing,
-                                             r_groups=r_groups, c_groups=c_groups,
-                                             weight=weight)
+                series = _compute_all_series(
+                    data,
+                    keep,
+                    var,
+                    stat,
+                    missing,
+                    r_groups=r_groups,
+                    c_groups=c_groups,
+                    weight=weight,
+                )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
             else:
                 # ALL on both: pass both for correct denominator selection
                 keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(data, keep, var, stat, missing,
-                                             r_groups=r_groups, c_groups=c_groups,
-                                             weight=weight)
+                series = _compute_all_series(
+                    data,
+                    keep,
+                    var,
+                    stat,
+                    missing,
+                    r_groups=r_groups,
+                    c_groups=c_groups,
+                    weight=weight,
+                )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
     def _index_value_key(orig_col, v):
-        """
-        Sort key for sort_by='index': order by each value's POSITION in the
+        """Sort key for sort_by='index': order by each value's POSITION in the
         labels dict as written by the caller (dict insertion order).
 
         Looks up v ONLY in labels[orig_col] (the dict belonging to this
@@ -1811,8 +1903,7 @@ def flextab(
         return (1, _na_safe_str(v))
 
     def _label_text_value_key(orig_col, v):
-        """
-        Sort key for sort_by='label': order alphabetically by the DISPLAY
+        """Sort key for sort_by='label': order alphabetically by the DISPLAY
         LABEL TEXT (the dict's value), not by dict-write order and not by
         the raw code.
 
@@ -1838,16 +1929,18 @@ def flextab(
 
     def _sort_keys(keys, hdr_path):
         """Sort row/col keys, respecting sort_by='code', 'index', or 'label'."""
-        if sort_by == 'index' and _label_map:
+        if sort_by == "index" and _label_map:
             value_key_fn = _index_value_key
-        elif sort_by == 'label' and _label_map:
+        elif sort_by == "label" and _label_map:
             value_key_fn = _label_text_value_key
         else:
             value_key_fn = None
         return _sort_row_keys(keys, hdr_path, value_key_fn=value_key_fn)
 
     all_row_keys = _sort_keys(list(dict.fromkeys(rk for rk in cells)), row_hdr_path)
-    all_col_keys = _sort_keys(list(dict.fromkeys(ck for rk in cells for ck in cells[rk])), col_hdr_path)
+    all_col_keys = _sort_keys(
+        list(dict.fromkeys(ck for rk in cells for ck in cells[rk])), col_hdr_path
+    )
 
     matrix = np.full((len(all_row_keys), len(all_col_keys)), np.nan)
     rk_pos = {rk: i for i, rk in enumerate(all_row_keys)}
@@ -1858,8 +1951,7 @@ def flextab(
             matrix[rk_pos[rk], ck_pos[ck]] = val
 
     def _fmt_val(v, col_name=None):
-        """
-        Format a group key value for display, applying label remapping.
+        """Format a group key value for display, applying label remapping.
 
         col_name : the original groupby column this value belongs to. Only
                    that column's label dict (labels[col_name]) is consulted,
@@ -1883,8 +1975,7 @@ def flextab(
         return str(v)
 
     def _compute_slot_layout(all_path_orders):
-        """
-        Compute display slots per position across all specs.
+        """Compute display slots per position across all specs.
 
         Each cross-position gets:
           2 slots  if ANY spec has kind='group' there WITH a non-blank label
@@ -1899,17 +1990,14 @@ def flextab(
         slots = []
         for i in range(max_len):
             has_labeled_group = any(
-                i < len(po)
-                and po[i][0] == "group"
-                and po[i][1]          # label is non-blank
+                i < len(po) and po[i][0] == "group" and po[i][1]  # label is non-blank
                 for po in all_path_orders
             )
             slots.append(2 if has_labeled_group else 1)
         return slots
 
     def _key_to_label_slotted(hdr, data_key, path_order, slots):
-        """
-        Build a fixed-length index tuple using a pre-computed slot layout.
+        """Build a fixed-length index tuple using a pre-computed slot layout.
 
         D = sum(slots) levels total. Slots assigned bottom-up: the innermost
         (rightmost) path_order position occupies the lowest (rightmost) slots.
@@ -1930,8 +2018,10 @@ def flextab(
 
         D = sum(slots)
         is_total = (not data_key) or data_key == (_SENTINEL,)
-        dvals = [] if is_total else list(
-            data_key if isinstance(data_key, tuple) else (data_key,)
+        dvals = (
+            []
+            if is_total
+            else list(data_key if isinstance(data_key, tuple) else (data_key,))
         )
         data_iter = iter(dvals)
 
@@ -1939,7 +2029,7 @@ def flextab(
         group_slots_pos = [i for i, e in enumerate(path_order) if e[0] == "group"]
 
         # Slots used by THIS spec's path_order positions
-        my_slots = slots[-len(path_order):]   # align from bottom
+        my_slots = slots[-len(path_order) :]  # align from bottom
         my_D = sum(my_slots)
         # Offset: how many bottom-slots this spec doesn't use (front-pad)
         offset = D - my_D
@@ -1948,13 +2038,13 @@ def flextab(
             # local_pos is the index within path_order (0 = outermost of THIS spec)
             # map to the global slots list (bottom-aligned)
             global_pos = len(slots) - len(path_order) + local_pos
-            low  = sum(slots[global_pos + 1:])
+            low = sum(slots[global_pos + 1 :])
             high = low + slots[global_pos] - 1
             return D - 1 - high, D - 1 - low  # (hi_idx, lo_idx)
 
         for pos, entry in enumerate(path_order):
-            kind      = entry[0]
-            label     = entry[1]
+            kind = entry[0]
+            label = entry[1]
             orig_name = entry[2] if len(entry) > 2 else None
             hi_idx, lo_idx = slot_range(pos)
 
@@ -1964,11 +2054,11 @@ def flextab(
                 if is_total:
                     pass
                 else:
-                    val     = next(data_iter, None)
+                    val = next(data_iter, None)
                     val_str = _fmt_val(val, col_name=orig_name)
-                    is_last = (pos == group_slots_pos[-1])
+                    is_last = pos == group_slots_pos[-1]
                     global_pos = len(slots) - len(path_order) + pos
-                    has_label_slot = (slots[global_pos] == 2)
+                    has_label_slot = slots[global_pos] == 2
                     # In the 2-slot system, every group position has a dedicated
                     # label slot (hi_idx) and value slot (lo_idx). Whether a
                     # group is "preceding" or "last" no longer matters for slot
@@ -1983,8 +2073,7 @@ def flextab(
         return tuple(row) if any(row) else ("",)
 
     def make_index(keys, hdr_path):
-        """
-        Convert (hdr, data_key) pairs to a MultiIndex using slot-based layout.
+        """Convert (hdr, data_key) pairs to a MultiIndex using slot-based layout.
 
         Every spec in the dimension produces a fixed-length tuple of the same
         depth D = sum(slots), where the slot layout is computed globally so
@@ -1999,7 +2088,7 @@ def flextab(
         is dropped — these are structural artefacts (e.g. the label slot of a
         group whose label was suppressed with ='') that carry no information.
 
-        Examples
+        Examples:
         --------
         Expression ``n colpctn*(all age_group)`` produces specs:
           [stat:N]                         → ('N',)        1 position
@@ -2019,15 +2108,16 @@ def flextab(
         vertically with 'Asia' in the detail rows (2-slot group positions).
         """
         all_po = [hdr_path.get(hdr, ([], 0))[0] for hdr, _ in keys]
-        slots  = _compute_slot_layout(all_po)
-        D      = sum(slots)
+        slots = _compute_slot_layout(all_po)
+        D = sum(slots)
 
         if D == 0:
             return pd.Index([""] * len(keys))
 
         labels = [
             _key_to_label_slotted(
-                hdr, dk,
+                hdr,
+                dk,
                 hdr_path.get(hdr, ([], 0))[0],
                 slots,
             )
@@ -2036,10 +2126,7 @@ def flextab(
 
         # Drop levels that are blank in every column
         if labels and len(labels[0]) > 1:
-            keep = [
-                i for i in range(len(labels[0]))
-                if any(t[i] for t in labels)
-            ]
+            keep = [i for i in range(len(labels[0])) if any(t[i] for t in labels)]
             if len(keep) < len(labels[0]):
                 labels = [tuple(t[i] for i in keep) for t in labels]
 
@@ -2089,7 +2176,7 @@ def flextab(
     result.attrs["col_fmt_map"] = col_fmt_map
     result.attrs["row_fmt_map"] = row_fmt_map
     result.attrs["default_fmt"] = fmt
-    result.attrs["style"]       = style or {}
+    result.attrs["style"] = style or {}
 
     # Apply row_header: name the row index so it prints as a column label
     if row_header is not None:
@@ -2105,9 +2192,9 @@ def flextab(
 # 12. ROW-KEY SORT
 # ---------------------------------------------------------------------------
 
+
 def _sort_row_keys(row_keys: list, hdr_path: dict = None, value_key_fn=None) -> list:
-    """
-    Re-order row/column keys to follow the TABLE expression's written order.
+    """Re-order row/column keys to follow the TABLE expression's written order.
 
     Two ordering rules combine, applied in this priority:
 
@@ -2279,8 +2366,7 @@ _NAN_SENTINEL = "__nan__"
 
 
 def _normalise_key(val):
-    """
-    Normalise a group key value so that all missing-value representations
+    """Normalise a group key value so that all missing-value representations
     (float nan, pd.NA, pd.NaT, None) map to a single canonical object.
     This prevents duplicate row/column keys when different aggregation calls
     (e.g. groupby on a column vs .size()) return different NA types.
@@ -2320,7 +2406,7 @@ def _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups):
             # Normalise before slicing so all NA types hash consistently
             idx_tuple = _normalise_idx(idx_tuple)
             r_data = idx_tuple[:n_r] if n_r else (_SENTINEL,)
-            c_data = idx_tuple[n_r:n_r + n_c] if n_c else (_SENTINEL,)
+            c_data = idx_tuple[n_r : n_r + n_c] if n_c else (_SENTINEL,)
 
         rk = (r_hdr, r_data)
         ck = (c_hdr, c_data)
@@ -2329,14 +2415,13 @@ def _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups):
         cells[rk][ck] = value
 
 
-
 # ---------------------------------------------------------------------------
 # 14. FORMAT SPEC PARSER
 # ---------------------------------------------------------------------------
 
+
 def _parse_fmt_spec(spec: str):
-    """
-    Parse a format specification string and return a callable formatter.
+    """Parse a format specification string and return a callable formatter.
 
     Called internally when a *format=... suffix is encountered in the TABLE
     expression.  The resulting formatter is stored in result.attrs['col_fmt_map']
@@ -2358,7 +2443,7 @@ def _parse_fmt_spec(spec: str):
     The W and sep together determine the output style — W itself is not
     used for padding since flextab() returns string-valued cells.
 
-    Examples
+    Examples:
     --------
       "7.1"   -> 1 decimal, point:              1 234.6
       "7,2"   -> 2 decimals, comma:             1 234,56
@@ -2367,20 +2452,22 @@ def _parse_fmt_spec(spec: str):
       "9.0s"  -> 0 decimals, space thousands:   1 235
       "7,2s"  -> 2 decimals, comma + space:     1 234,56
 
-    Returns
+    Returns:
     -------
     Callable (value: Any) -> str
         A formatting function.  Non-numeric values are returned as str(value).
     """
-    m = re.fullmatch(r'[0-9]+([.,])([0-9]+)([_s]*)', spec.strip())
+    m = re.fullmatch(r"[0-9]+([.,])([0-9]+)([_s]*)", spec.strip())
     if not m:
-        raise ValueError(f"Invalid format spec {spec!r}. Expected W.D[_|s] or W,D[_|s].")
-    dec_sep   = m.group(1)          # '.' or ',' — the decimal separator
-    decimals  = int(m.group(2))
+        raise ValueError(
+            f"Invalid format spec {spec!r}. Expected W.D[_|s] or W,D[_|s]."
+        )
+    dec_sep = m.group(1)  # '.' or ',' — the decimal separator
+    decimals = int(m.group(2))
     modifiers = m.group(3)
-    use_comma       = (dec_sep == ',')  # decimal comma instead of decimal point
-    use_thousands   = '_' in modifiers  # thousands grouping (opposite char of dec_sep)
-    use_space_thous = 's' in modifiers  # thousands grouping with space
+    use_comma = dec_sep == ","  # decimal comma instead of decimal point
+    use_thousands = "_" in modifiers  # thousands grouping (opposite char of dec_sep)
+    use_space_thous = "s" in modifiers  # thousands grouping with space
 
     def _fmt(value):
         try:
@@ -2398,12 +2485,12 @@ def _parse_fmt_spec(spec: str):
             if use_comma:
                 # s looks like "1,234.56" (thousands=',' decimal='.').
                 # Replace thousands ',' with space, then decimal '.' with ','.
-                s = s.replace(',', ' ').replace('.', ',')
+                s = s.replace(",", " ").replace(".", ",")
             else:
-                s = s.replace(',', ' ')
+                s = s.replace(",", " ")
         elif use_comma:
             # Swap . and , for European style: 1,234.56 -> 1.234,56
-            s = s.replace(',', '\u00b6').replace('.', ',').replace('\u00b6', '.')
+            s = s.replace(",", "\u00b6").replace(".", ",").replace("\u00b6", ".")
 
         return s
 
@@ -2414,9 +2501,9 @@ def _parse_fmt_spec(spec: str):
 # 15. PRETTY-PRINT HELPER
 # ---------------------------------------------------------------------------
 
+
 def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
-    """
-    Build a string-valued copy of result with per-column AND per-row formats
+    """Build a string-valued copy of result with per-column AND per-row formats
     applied.
 
     A format= spec can appear on either the row or the column dimension of
@@ -2451,8 +2538,7 @@ def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
 
 
 def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
-    """
-    Render a flextab() result as a formatted string.
+    """Render a flextab() result as a formatted string.
 
     Parameters
     ----------
@@ -2467,19 +2553,19 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
     na_rep : str, default "."
         Text shown in place of NaN / missing cells.
 
-    Returns
+    Returns:
     -------
     str
         A fixed-width string suitable for printing.
 
-    Notes
+    Notes:
     -----
     Per-cell format= specs from the TABLE expression (e.g. *format=7,1
     or *format=12.0s) take precedence over the fmt parameter for their
     specific cells.  The fmt parameter acts as the default for any cell
     without an explicit format= spec.
 
-    Examples
+    Examples:
     --------
     print(flextab_to_string(r))                   # default fmt
     print(flextab_to_string(r, fmt="{:.0f}"))     # 0 decimals everywhere
@@ -2489,8 +2575,7 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
 
 
 def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
-    """
-    Render a flextab() result as a plain Markdown table, with flattened,
+    """Render a flextab() result as a plain Markdown table, with flattened,
     human-readable column headers instead of the raw index tuples that
     pandas' inherited DataFrame.to_markdown() shows for a MultiIndex, and
     with format= specs from the TABLE expression applied to the numbers.
@@ -2533,12 +2618,12 @@ def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
         Separator used to join a MultiIndex column's levels into one
         header label.
 
-    Returns
+    Returns:
     -------
     str
         A GitHub-flavoured Markdown table.
 
-    Examples
+    Examples:
     --------
     print(flextab_to_markdown(r))
     with open("table.md", "w") as f:
@@ -2586,9 +2671,9 @@ def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
 # 16. FLEXTAB RESULT CLASS (DISPLAY & EXCEL EXPORT)
 # ---------------------------------------------------------------------------
 
+
 class FlextabResult(pd.DataFrame):
-    """
-    DataFrame subclass returned by flextab().
+    """DataFrame subclass returned by flextab().
 
     Numeric values are fully preserved — arithmetic, .sum(), slicing, and
     all other DataFrame operations work exactly as on a plain DataFrame.
@@ -2621,8 +2706,7 @@ class FlextabResult(pd.DataFrame):
 
     @staticmethod
     def _to_hex(color) -> str:
-        """
-        Normalise a colour specification to a 6-character uppercase hex string
+        """Normalise a colour specification to a 6-character uppercase hex string
         (no '#' prefix) suitable for openpyxl and CSS.
 
         Accepts:
@@ -2642,15 +2726,29 @@ class FlextabResult(pd.DataFrame):
             return s.upper()
         # Named colour: convert via a small lookup of common names
         _names = {
-            "black": "000000", "white": "FFFFFF",
-            "red": "FF0000", "green": "008000", "blue": "0000FF",
-            "yellow": "FFFF00", "orange": "FFA500", "purple": "800080",
-            "grey": "808080", "gray": "808080",
-            "lightgrey": "D3D3D3", "lightgray": "D3D3D3",
-            "darkgrey": "A9A9A9", "darkgray": "A9A9A9",
-            "navy": "000080", "teal": "008080", "maroon": "800000",
-            "silver": "C0C0C0", "lime": "00FF00", "cyan": "00FFFF",
-            "magenta": "FF00FF", "pink": "FFC0CB", "beige": "F5F5DC",
+            "black": "000000",
+            "white": "FFFFFF",
+            "red": "FF0000",
+            "green": "008000",
+            "blue": "0000FF",
+            "yellow": "FFFF00",
+            "orange": "FFA500",
+            "purple": "800080",
+            "grey": "808080",
+            "gray": "808080",
+            "lightgrey": "D3D3D3",
+            "lightgray": "D3D3D3",
+            "darkgrey": "A9A9A9",
+            "darkgray": "A9A9A9",
+            "navy": "000080",
+            "teal": "008080",
+            "maroon": "800000",
+            "silver": "C0C0C0",
+            "lime": "00FF00",
+            "cyan": "00FFFF",
+            "magenta": "FF00FF",
+            "pink": "FFC0CB",
+            "beige": "F5F5DC",
         }
         key = s.lower()
         if key in _names:
@@ -2663,8 +2761,7 @@ class FlextabResult(pd.DataFrame):
 
     @staticmethod
     def _resolve_color(spec, idx: int):
-        """
-        Resolve a style-dict colour spec for row/band index `idx`.
+        """Resolve a style-dict colour spec for row/band index `idx`.
 
         Every style key (header_bg/fg, row_bg/fg, row_header_bg/fg,
         cell_bg/fg) uses this same technique:
@@ -2679,15 +2776,17 @@ class FlextabResult(pd.DataFrame):
         """
         if spec is None:
             return None
-        if isinstance(spec, (list, tuple)) and len(spec) == 2 \
-                and not (isinstance(spec[0], int) and len(spec) == 3):
+        if (
+            isinstance(spec, (list, tuple))
+            and len(spec) == 2
+            and not (isinstance(spec[0], int) and len(spec) == 3)
+        ):
             return spec[idx % 2]
         return spec
 
     @staticmethod
     def _fmt_to_excel_numfmt(formatter) -> str:
-        """
-        Convert a _parse_fmt_spec formatter to an Excel number format string.
+        """Convert a _parse_fmt_spec formatter to an Excel number format string.
 
         Inspects the closure variables of the formatter to reliably determine
         decimals, decimal-comma, and thousands-separator settings — rather than
@@ -2705,12 +2804,11 @@ class FlextabResult(pd.DataFrame):
         try:
             # Access the closure to get the exact formatting parameters
             fvars = formatter.__code__.co_freevars
-            fvals = {k: v.cell_contents for k, v in
-                     zip(fvars, formatter.__closure__)}
-            decimals        = fvals.get("decimals", 0)
-            use_comma       = fvals.get("use_comma", False)       # decimal comma
-            use_thousands   = fvals.get("use_thousands", False)   # _ separator
-            use_space_thous = fvals.get("use_space_thous", False) # s separator
+            fvals = {k: v.cell_contents for k, v in zip(fvars, formatter.__closure__)}
+            decimals = fvals.get("decimals", 0)
+            use_comma = fvals.get("use_comma", False)  # decimal comma
+            use_thousands = fvals.get("use_thousands", False)  # _ separator
+            use_space_thous = fvals.get("use_space_thous", False)  # s separator
 
             # Build the Excel number format. Excel always uses ',' for thousands
             # grouping internally regardless of locale display.
@@ -2720,15 +2818,15 @@ class FlextabResult(pd.DataFrame):
             else:
                 dec_part = ""
             if thous:
-                return f'#,##0{dec_part}'
+                return f"#,##0{dec_part}"
             else:
-                return f'0{dec_part}'
+                return f"0{dec_part}"
         except Exception:
             # Fall back to parsing the formatted output if closure inspection fails
             try:
                 sample = formatter(1234.5)
                 # Count decimal places
-                for sep in (',', '.'):
+                for sep in (",", "."):
                     if sep in sample:
                         return f'0.{"0" * len(sample.split(sep)[-1])}'
                 return "0"
@@ -2748,8 +2846,7 @@ class FlextabResult(pd.DataFrame):
         return self.__repr__()
 
     def _repr_html_(self):
-        """
-        Jupyter/IPython HTML display with format= specs AND inline CSS
+        """Jupyter/IPython HTML display with format= specs AND inline CSS
         colours from the style= parameter applied.
 
         Style keys and what they colour (see flextab()'s style= docstring
@@ -2791,12 +2888,12 @@ class FlextabResult(pd.DataFrame):
 
             header_bg_spec = style.get("header_bg")
             header_fg_spec = style.get("header_fg")
-            row_bg_spec    = style.get("row_bg")
-            row_fg_spec    = style.get("row_fg")
-            rh_bg_spec     = style.get("row_header_bg")
-            rh_fg_spec     = style.get("row_header_fg")
-            cell_bg_spec   = style.get("cell_bg")
-            cell_fg_spec   = style.get("cell_fg")
+            row_bg_spec = style.get("row_bg")
+            row_fg_spec = style.get("row_fg")
+            rh_bg_spec = style.get("row_header_bg")
+            rh_fg_spec = style.get("row_header_fg")
+            cell_bg_spec = style.get("cell_bg")
+            cell_fg_spec = style.get("cell_fg")
 
             # Text of the row_header cell(s), so we can single it out among
             # the <th> cells in the header area.
@@ -2807,11 +2904,22 @@ class FlextabResult(pd.DataFrame):
 
             html = formatted.to_html(border=0)
 
-            any_style = any([header_bg_spec, header_fg_spec, row_bg_spec, row_fg_spec,
-                              rh_bg_spec, rh_fg_spec, cell_bg_spec, cell_fg_spec])
+            any_style = any(
+                [
+                    header_bg_spec,
+                    header_fg_spec,
+                    row_bg_spec,
+                    row_fg_spec,
+                    rh_bg_spec,
+                    rh_fg_spec,
+                    cell_bg_spec,
+                    cell_fg_spec,
+                ]
+            )
             if any_style:
-                import re as _re
                 import html as _html
+                import re as _re
+
                 lines = html.splitlines()
                 out = []
                 data_row_idx = 0
@@ -2823,7 +2931,7 @@ class FlextabResult(pd.DataFrame):
                     if not css_str:
                         return m.group(0)
                     return _re.sub(
-                        r'<th\b([^>]*)>',
+                        r"<th\b([^>]*)>",
                         lambda mm: f'<th{mm.group(1)} style="{css_str}">',
                         m.group(0),
                     )
@@ -2841,7 +2949,7 @@ class FlextabResult(pd.DataFrame):
                     elif in_thead and in_thead_row and stripped.startswith("<th"):
                         # Is this the row_header cell (holds the row_header=
                         # text), or a plain column-header cell?
-                        text = _html.unescape(_re.sub(r'<[^>]+>', '', stripped)).strip()
+                        text = _html.unescape(_re.sub(r"<[^>]+>", "", stripped)).strip()
                         if row_header_names and text in row_header_names:
                             rh_bg = _resolve(rh_bg_spec, header_row_idx)
                             rh_fg = _resolve(rh_fg_spec, header_row_idx)
@@ -2852,7 +2960,7 @@ class FlextabResult(pd.DataFrame):
                             css_str = _css(hdr_bg, hdr_fg)
                         if css_str:
                             line = _re.sub(
-                                r'<th\b[^>]*>.*?</th>',
+                                r"<th\b[^>]*>.*?</th>",
                                 lambda m, _c=css_str: _style_one_th(m, _c),
                                 line,
                             )
@@ -2867,7 +2975,7 @@ class FlextabResult(pd.DataFrame):
                         row_css = _css(rb, rf)
                         if row_css:
                             line = _re.sub(
-                                r'<th\b([^>]*?)>',
+                                r"<th\b([^>]*?)>",
                                 lambda m: f'<th{m.group(1)} style="{row_css}">',
                                 line,
                             )
@@ -2879,7 +2987,7 @@ class FlextabResult(pd.DataFrame):
                         cell_css = _css(cb, cf)
                         if cell_css:
                             line = _re.sub(
-                                r'<td\b([^>]*?)>',
+                                r"<td\b([^>]*?)>",
                                 lambda m: f'<td{m.group(1)} style="{cell_css}">',
                                 line,
                             )
@@ -2901,8 +3009,7 @@ class FlextabResult(pd.DataFrame):
     # ── Excel export ──────────────────────────────────────────────────────
 
     def to_excel(self, excel_writer, sheet_name="Sheet1", **kwargs):
-        """
-        Write to an Excel file with number formatting and colour styling
+        """Write to an Excel file with number formatting and colour styling
         preserved via openpyxl post-processing.
 
         Parameters
@@ -2933,7 +3040,7 @@ class FlextabResult(pd.DataFrame):
         Every key accepts a single colour (applied to every row) or a
         (colour0, colour1) 2-tuple that cycles through rows.
 
-        Notes
+        Notes:
         -----
         If excel_writer is a file path (str or Path), the file is written
         and post-processed in one step. If it is an open ExcelWriter, the
@@ -2941,16 +3048,19 @@ class FlextabResult(pd.DataFrame):
         call ExcelWriter.close() / use it as a context manager to save.
         """
         import io
+
         try:
             from openpyxl import load_workbook
-            from openpyxl.styles import PatternFill, Font
+            from openpyxl.styles import Font
+            from openpyxl.styles import PatternFill
+
             HAS_OPENPYXL = True
         except ImportError:
             HAS_OPENPYXL = False
 
         col_fmt_map = self.attrs.get("col_fmt_map", {})
         row_fmt_map = self.attrs.get("row_fmt_map", {})
-        style       = self.attrs.get("style", {})
+        style = self.attrs.get("style", {})
 
         is_path = isinstance(excel_writer, (str, __import__("pathlib").Path))
 
@@ -2980,9 +3090,9 @@ class FlextabResult(pd.DataFrame):
         # name set (e.g. row_header="Origin and type").  Detect this extra row
         # by comparing the actual sheet row count to what we'd expect without it.
         n_col_header_rows = self.columns.nlevels
-        n_row_index_cols  = self.index.nlevels
-        n_data_rows       = len(self)
-        n_data_cols       = len(self.columns)
+        n_row_index_cols = self.index.nlevels
+        n_data_rows = len(self)
+        n_data_cols = len(self.columns)
 
         expected_rows_no_name = n_col_header_rows + n_data_rows
         actual_rows = ws.max_row
@@ -2993,8 +3103,9 @@ class FlextabResult(pd.DataFrame):
         def _fill(hex_color):
             if not hex_color:
                 return None
-            return PatternFill(start_color=hex_color, end_color=hex_color,
-                               fill_type="solid")
+            return PatternFill(
+                start_color=hex_color, end_color=hex_color, fill_type="solid"
+            )
 
         def _font(hex_color):
             if not hex_color:
@@ -3009,12 +3120,12 @@ class FlextabResult(pd.DataFrame):
 
         header_bg_spec = style.get("header_bg")
         header_fg_spec = style.get("header_fg")
-        row_bg_spec    = style.get("row_bg")
-        row_fg_spec    = style.get("row_fg")
-        rh_bg_spec     = style.get("row_header_bg")
-        rh_fg_spec     = style.get("row_header_fg")
-        cell_bg_spec   = style.get("cell_bg")
-        cell_fg_spec   = style.get("cell_fg")
+        row_bg_spec = style.get("row_bg")
+        row_fg_spec = style.get("row_fg")
+        rh_bg_spec = style.get("row_header_bg")
+        rh_fg_spec = style.get("row_header_fg")
+        cell_bg_spec = style.get("cell_bg")
+        cell_fg_spec = style.get("cell_fg")
 
         def _resolve_hex(spec, idx):
             """Resolve a style spec (single colour or cycling 2-tuple) to hex for row idx."""
@@ -3027,8 +3138,11 @@ class FlextabResult(pd.DataFrame):
         # cells are excluded from the header_bg/fg loop below and coloured
         # separately by row_header_bg/fg, so header_bg never bleeds into
         # them when row_header_bg is left unset.
-        has_row_header = bool(self.index.names[0]) if isinstance(self.index, pd.MultiIndex) \
+        has_row_header = (
+            bool(self.index.names[0])
+            if isinstance(self.index, pd.MultiIndex)
             else bool(self.index.name)
+        )
         row_header_row = (first_data_row - 1) if has_row_header else None
 
         # ── Header rows (column headers, excluding the row_header cells) ───
@@ -3054,8 +3168,8 @@ class FlextabResult(pd.DataFrame):
             xl_row = first_data_row + data_row_idx
             cur_cell_bg = _resolve_hex(cell_bg_spec, data_row_idx)
             cur_cell_fg = _resolve_hex(cell_fg_spec, data_row_idx)
-            cur_row_bg  = _resolve_hex(row_bg_spec, data_row_idx)
-            cur_row_fg  = _resolve_hex(row_fg_spec, data_row_idx)
+            cur_row_bg = _resolve_hex(row_bg_spec, data_row_idx)
+            cur_row_fg = _resolve_hex(row_fg_spec, data_row_idx)
 
             for c in range(1, n_row_index_cols + n_data_cols + 1):
                 cell = ws.cell(xl_row, c)
@@ -3092,9 +3206,6 @@ class FlextabResult(pd.DataFrame):
             wb.save(excel_writer)
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # 17. SMOKE TESTS
 # ---------------------------------------------------------------------------
@@ -3102,12 +3213,14 @@ class FlextabResult(pd.DataFrame):
 if __name__ == "__main__":
     np.random.seed(42)
     n = 200
-    demo = pd.DataFrame({
-        "origin":     np.random.choice(["Asia", "Europe", "USA"], n),
-        "type":       np.random.choice(["Sedan", "SUV", "Truck"], n),
-        "msrp":       np.random.normal(35000, 12000, n).clip(10000),
-        "horsepower": np.random.normal(220, 60, n).clip(80),
-    })
+    demo = pd.DataFrame(
+        {
+            "origin": np.random.choice(["Asia", "Europe", "USA"], n),
+            "type": np.random.choice(["Sedan", "SUV", "Truck"], n),
+            "msrp": np.random.normal(35000, 12000, n).clip(10000),
+            "horsepower": np.random.normal(220, 60, n).clip(80),
+        }
+    )
 
     sep = "=" * 70
 
@@ -3115,7 +3228,8 @@ if __name__ == "__main__":
     print("Example 1 — 1D, no groupby, stat labels")
     print(sep)
     r1 = flextab(
-        data=demo, measure=["msrp", "horsepower"],
+        data=demo,
+        measure=["msrp", "horsepower"],
         table="msrp='' * (N MEAN='Average' STD='Std Dev') horsepower='' * (N MEAN='Average')",
     )
     print(flextab_to_string(r1))
@@ -3124,7 +3238,9 @@ if __name__ == "__main__":
     print("Example 2 — 2D: origin renamed, msrp suppressed")
     print(sep)
     r2 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin"],
         table="origin='Region', msrp='' * (N MEAN='Mean' ROWPCTN='Row %')",
     )
     print(flextab_to_string(r2))
@@ -3133,7 +3249,9 @@ if __name__ == "__main__":
     print("Example 3 — ALL='Total' in row dimension")
     print(sep)
     r3 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin"],
         table="origin ALL='Total', msrp='' * (N MEAN='Mean' MIN MAX)",
     )
     print(flextab_to_string(r3))
@@ -3142,7 +3260,9 @@ if __name__ == "__main__":
     print("Example 4 — ALL in both dimensions (grand-total row + col)")
     print(sep)
     r4 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin", "type"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin", "type"],
         table="origin * type ALL='Subtotal', msrp='' * (N MEAN='Mean') ALL='Grand Total'",
     )
     print(flextab_to_string(r4))
@@ -3151,7 +3271,9 @@ if __name__ == "__main__":
     print("Example 5 — Percent stats with labels")
     print(sep)
     r5 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin"],
         table="origin='Region' ALL='Total', msrp='' * (PCTN='% of Total' COLPCTN='Col %')",
     )
     print(flextab_to_string(r5))
@@ -3160,7 +3282,8 @@ if __name__ == "__main__":
     print("Example 6 — Nested groupby + ALL subtotal")
     print(sep)
     r6 = flextab(
-        data=demo, measure=["msrp", "horsepower"],
+        data=demo,
+        measure=["msrp", "horsepower"],
         groupby=["origin", "type"],
         table="origin * (type ALL='Subtotal'), msrp='' * (N MEAN='Mean') horsepower='' * MEAN='Mean'",
     )
@@ -3169,14 +3292,21 @@ if __name__ == "__main__":
     print(f"\n{sep}")
     print("Example 7 — nan rows: single nan per groupby value")
     print(sep)
-    demo2 = pd.DataFrame({"origin": ["Asia", None, "USA"], "msrp": [30000, 40000, None]})
+    demo2 = pd.DataFrame(
+        {"origin": ["Asia", None, "USA"], "msrp": [30000, 40000, None]}
+    )
     r7 = flextab(
-        data=demo2, groupby=["origin"], measure=["msrp"],
+        data=demo2,
+        groupby=["origin"],
+        measure=["msrp"],
         table="origin, msrp*(sum n) n",
-        include_missing_in_groupby=True)
+        include_missing_in_groupby=True,
+    )
     print(flextab_to_string(r7))
     assert len(r7) == 3, f"Expected 3 rows, got {len(r7)}"
     # Index is now (label, value) tuples e.g. ('origin','nan') — check value level
     idx_values = [t[-1] if isinstance(t, tuple) else t for t in r7.index]
-    assert idx_values.count("nan") == 1, f"nan should appear exactly once, got: {idx_values}"
+    assert (
+        idx_values.count("nan") == 1
+    ), f"nan should appear exactly once, got: {idx_values}"
     print("OK: 3 rows, nan appears once")

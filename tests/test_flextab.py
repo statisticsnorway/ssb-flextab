@@ -1,5 +1,4 @@
-"""
-pytest test suite for flextab.py
+"""pytest test suite for flextab.py
 
 Run with:
     pytest test_flextab.py -v
@@ -9,44 +8,53 @@ numpy (not by calling flextab's own internals), so a test failure means
 flextab's output has actually diverged from the documented behaviour —
 not that the test is just re-deriving the same code path.
 """
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from ssb_flextab.flextab import flextab, flextab_to_string, FlextabResult
-
+from ssb_flextab.flextab import FlextabResult
+from ssb_flextab.flextab import flextab
+from ssb_flextab.flextab import flextab_to_string
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def df():
-    return pd.DataFrame({
-        "sex":        ["1", "1", "2", "1", None, "2", "2", "1", "2", "2"],
-        "age_group":  ["2", "1", "2", "3", "1", "2", "2", "2", "3", None],
-        "region":     [None, "2", "1", "2", "2", "3", "3", "2", "2", "1"],
-        "education":  ["3", "2", "3", "1", "3", "3", "3", "1", "3", "2"],
-        "income":     [300, 100, 450, 200, 650, 750, None, 850, 400, 350],
-        "tax":        [100, 10, 200, 90, 340, 370, 30, None, 150, 150],
-        "weight":     [1.5, 3.2, 1.7, 2.2, 6.1, 4.2, 1.9, 4.8, None, 8.2],
-    })
+    return pd.DataFrame(
+        {
+            "sex": ["1", "1", "2", "1", None, "2", "2", "1", "2", "2"],
+            "age_group": ["2", "1", "2", "3", "1", "2", "2", "2", "3", None],
+            "region": [None, "2", "1", "2", "2", "3", "3", "2", "2", "1"],
+            "education": ["3", "2", "3", "1", "3", "3", "3", "1", "3", "2"],
+            "income": [300, 100, 450, 200, 650, 750, None, 850, 400, 350],
+            "tax": [100, 10, 200, 90, 340, 370, 30, None, 150, 150],
+            "weight": [1.5, 3.2, 1.7, 2.2, 6.1, 4.2, 1.9, 4.8, None, 8.2],
+        }
+    )
 
 
 @pytest.fixture
 def labels():
     return {
-        "sex":       {"1": "Males", "2": "Females"},
+        "sex": {"1": "Males", "2": "Females"},
         "age_group": {"1": "0-19", "2": "20-66", "3": "67+"},
-        "region":    {"1": "West", "2": "East", "3": "Central"},
-        "education": {"3": "Higher education", "2": "Secondary school",
-                       "1": "Elementary school"},
+        "region": {"1": "West", "2": "East", "3": "Central"},
+        "education": {
+            "3": "Higher education",
+            "2": "Secondary school",
+            "1": "Elementary school",
+        },
     }
 
 
 # ---------------------------------------------------------------------------
 # Small helper: pull a scalar cell out of a result by (row_key, col_key)
 # ---------------------------------------------------------------------------
+
 
 def cell(result, row, col):
     return result.loc[row, col]
@@ -55,6 +63,7 @@ def cell(result, row, col):
 # ---------------------------------------------------------------------------
 # 1. Counts & missing-value handling
 # ---------------------------------------------------------------------------
+
 
 class TestCounts:
 
@@ -75,24 +84,25 @@ class TestCounts:
         assert r["N"].sum() == len(df)
 
     def test_include_missing_false_drops_nan_group(self, df):
-        r = flextab(data=df, groupby="sex", table="sex, N",
-                    include_missing_in_groupby=False)
+        r = flextab(
+            data=df, groupby="sex", table="sex, N", include_missing_in_groupby=False
+        )
         row_values = [idx[-1] if isinstance(idx, tuple) else idx for idx in r.index]
         assert "nan" not in row_values
         assert r["N"].sum() == df["sex"].notna().sum()
 
     def test_n_counts_nonmissing_measure_values(self, df):
         # sex == "2" has 5 rows but one has income missing -> N should be 4
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*N")
+        r = flextab(data=df, groupby="sex", measure="income", table="sex, income=''*N")
         assert cell(r, ("sex", "2"), "N") == 4
         assert cell(r, ("sex", "1"), "N") == 4
 
     def test_size_counts_all_rows_including_missing_measure(self, df):
         # SIZE counts every row in the group, unlike N/COUNT
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*SIZE")
-        assert cell(r, ("sex", "2"), "SIZE") == 5   # includes the missing income row
+        r = flextab(
+            data=df, groupby="sex", measure="income", table="sex, income=''*SIZE"
+        )
+        assert cell(r, ("sex", "2"), "SIZE") == 5  # includes the missing income row
         assert cell(r, ("sex", "1"), "SIZE") == 4
 
 
@@ -100,11 +110,13 @@ class TestCounts:
 # 2. Descriptive statistics on a measure
 # ---------------------------------------------------------------------------
 
+
 class TestDescriptiveStats:
 
     def test_sum_and_mean_by_group(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(SUM MEAN)")
+        r = flextab(
+            data=df, groupby="sex", measure="income", table="sex, income=''*(SUM MEAN)"
+        )
         expected_sum = df.groupby("sex", dropna=False)["income"].sum()
         expected_mean = df.groupby("sex", dropna=False)["income"].mean()
         for key in ["1", "2"]:
@@ -112,8 +124,9 @@ class TestDescriptiveStats:
             assert cell(r, ("sex", key), "MEAN") == pytest.approx(expected_mean[key])
 
     def test_std_and_var_use_sample_ddof(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(STD VAR)")
+        r = flextab(
+            data=df, groupby="sex", measure="income", table="sex, income=''*(STD VAR)"
+        )
         expected_std = df.groupby("sex", dropna=False)["income"].std()  # ddof=1 default
         expected_var = df.groupby("sex", dropna=False)["income"].var()
         for key in ["1", "2"]:
@@ -121,23 +134,29 @@ class TestDescriptiveStats:
             assert cell(r, ("sex", key), "VAR") == pytest.approx(expected_var[key])
 
     def test_median_and_percentiles(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(MEDIAN P25 P75)")
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*(MEDIAN P25 P75)",
+        )
         sub = df.loc[df["sex"] == "2", "income"]
         assert cell(r, ("sex", "2"), "MEDIAN") == pytest.approx(sub.median())
         assert cell(r, ("sex", "2"), "P25") == pytest.approx(sub.quantile(0.25))
         assert cell(r, ("sex", "2"), "P75") == pytest.approx(sub.quantile(0.75))
 
     def test_min_max(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(MIN MAX)")
+        r = flextab(
+            data=df, groupby="sex", measure="income", table="sex, income=''*(MIN MAX)"
+        )
         sub = df.loc[df["sex"] == "1", "income"]
         assert cell(r, ("sex", "1"), "MIN") == sub.min()
         assert cell(r, ("sex", "1"), "MAX") == sub.max()
 
     def test_nmiss_counts_missing_measure_values(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*NMISS")
+        r = flextab(
+            data=df, groupby="sex", measure="income", table="sex, income=''*NMISS"
+        )
         # income is missing exactly once, for a sex == "2" row (index 6)
         assert cell(r, ("sex", "2"), "NMISS") == 1
         assert cell(r, ("sex", "1"), "NMISS") == 0
@@ -154,11 +173,15 @@ class TestDescriptiveStats:
 # 3. Percentage statistics
 # ---------------------------------------------------------------------------
 
+
 class TestPercentages:
 
     def test_pctn_rowpctn_colpctn_two_way(self, df):
-        r = flextab(data=df, groupby=["sex", "region"],
-                    table="sex, region*(N PCTN ROWPCTN COLPCTN)")
+        r = flextab(
+            data=df,
+            groupby=["sex", "region"],
+            table="sex, region*(N PCTN ROWPCTN COLPCTN)",
+        )
 
         # sex=="1" & region=="2" -> 3 of 4 "1" rows, 3 of 10 overall,
         # 3 of the 4 rows where region=="2"
@@ -177,8 +200,12 @@ class TestPercentages:
         assert colpctn == pytest.approx(100 * 3 / region2_total)
 
     def test_pctsum_and_rowpctsum_single_dimension(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(PCTSUM ROWPCTSUM)")
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*(PCTSUM ROWPCTSUM)",
+        )
         grand_total = df["income"].sum()
         sex1_total = df.loc[df["sex"] == "1", "income"].sum()
         pctsum = cell(r, ("sex", "1"), "PCTSUM")
@@ -193,11 +220,16 @@ class TestPercentages:
 # 4. Custom denominator (PCTSUM<...> / PCTN<...>)
 # ---------------------------------------------------------------------------
 
+
 class TestCustomDenominator:
 
     def test_tax_as_pct_of_income_same_group(self, df):
-        r = flextab(data=df, groupby=["sex", "region"], measure=["income", "tax"],
-                    table="sex*region, tax*pctsum<income>")
+        r = flextab(
+            data=df,
+            groupby=["sex", "region"],
+            measure=["income", "tax"],
+            table="sex*region, tax*pctsum<income>",
+        )
         # sex=="2", region=="1" -> two rows (index 2, 9)
         sub = df[(df["sex"] == "2") & (df["region"] == "1")]
         expected = 100 * sub["tax"].sum() / sub["income"].sum()
@@ -219,11 +251,16 @@ class TestCustomDenominator:
 # 5. ALL / TOTAL marginal
 # ---------------------------------------------------------------------------
 
+
 class TestAllTotal:
 
     def test_all_row_is_grand_total(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex ALL='Total', income=''*(N MEAN)")
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex ALL='Total', income=''*(N MEAN)",
+        )
         # the ALL/TOTAL row's outer label level is blank, not 'sex' -
         # only the detail rows repeat the groupby column's own label
         total_row = cell(r, ("", "Total"), "N")
@@ -232,7 +269,9 @@ class TestAllTotal:
 
     def test_all_in_both_dimensions(self, df):
         r = flextab(
-            data=df, groupby=["sex", "region"], measure="income",
+            data=df,
+            groupby=["sex", "region"],
+            measure="income",
             table="sex ALL='Row total', income=''*N ALL='Col total'",
         )
         # bare ALL (no measure attached) counts every row in the data,
@@ -245,6 +284,7 @@ class TestAllTotal:
 # 6. Weighted statistics
 # ---------------------------------------------------------------------------
 
+
 class TestWeighted:
 
     def _weighted_ref(self, group, x="income", w="weight"):
@@ -255,8 +295,13 @@ class TestWeighted:
         return d[w].sum(), (d[x] * d[w]).sum(), wmean
 
     def test_weighted_sum_and_mean(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(SUM MEAN)", weight="weight")
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*(SUM MEAN)",
+            weight="weight",
+        )
         for key in ["1", "2"]:
             group = df[df["sex"] == key]
             _, expected_sum, expected_mean = self._weighted_ref(group)
@@ -275,32 +320,49 @@ class TestWeighted:
 # 7. Labels & sort_by
 # ---------------------------------------------------------------------------
 
+
 class TestLabelsAndSort:
 
     def test_labels_relabel_index_values(self, df, labels):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*N", labels=labels)
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*N",
+            labels=labels,
+        )
         row_values = {idx[-1] for idx in r.index}
         assert row_values == {"Males", "Females", "nan"}
 
     def test_sort_by_label_is_alphabetical(self, df, labels):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*N", labels=labels, sort_by="label")
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*N",
+            labels=labels,
+            sort_by="label",
+        )
         row_values = [idx[-1] for idx in r.index]
         # "Females" < "Males" < "nan" alphabetically
         assert row_values == ["Females", "Males", "nan"]
 
     def test_sort_by_index_uses_dict_order(self, df, labels):
-        r = flextab(data=df, groupby="age_group", measure="income",
-                    table="age_group, income=''*N", labels=labels, sort_by="index")
+        r = flextab(
+            data=df,
+            groupby="age_group",
+            measure="income",
+            table="age_group, income=''*N",
+            labels=labels,
+            sort_by="index",
+        )
         row_values = [idx[-1] for idx in r.index]
         # labels['age_group'] dict order is '1','2','3' -> 0-19, 20-66, 67+
         assert row_values == ["0-19", "20-66", "67+", "nan"]
 
     def test_default_sort_by_code(self, df):
         # sort_by='code' (default): sorts on the raw string values "1"<"2"
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*N")
+        r = flextab(data=df, groupby="sex", measure="income", table="sex, income=''*N")
         row_values = [idx[-1] for idx in r.index]
         assert row_values.index("1") < row_values.index("2")
 
@@ -309,25 +371,28 @@ class TestLabelsAndSort:
 # 8. Format specs & na_rep
 # ---------------------------------------------------------------------------
 
+
 class TestFormatting:
 
     def test_format_spec_controls_decimal_places(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*MEAN*format=8,0")
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*MEAN*format=8,0",
+        )
         text = flextab_to_string(r)
         # 0 decimal places -> no "." in the formatted mean values
         mean_lines = [l for l in text.splitlines() if "1" in l or "2" in l]
         assert any("." not in l.split()[-1] for l in mean_lines)
 
     def test_na_rep_used_for_missing_cells(self, df):
-        r = flextab(data=df, groupby=["sex", "region"],
-                    table="sex, region*N")
+        r = flextab(data=df, groupby=["sex", "region"], table="sex, region*N")
         text = flextab_to_string(r, na_rep="MISSING")
         assert "MISSING" in text
 
     def test_default_fmt_applies_when_no_format_spec(self, df):
-        r = flextab(data=df, measure="income", table="income=''*MEAN",
-                    fmt="{:.3f}")
+        r = flextab(data=df, measure="income", table="income=''*MEAN", fmt="{:.3f}")
         text = flextab_to_string(r, fmt="{:.3f}")
         assert "." in text  # 3 decimal places rendered
 
@@ -336,11 +401,14 @@ class TestFormatting:
 # 9. Two-dimensional nested tables
 # ---------------------------------------------------------------------------
 
+
 class TestNestedTables:
 
     def test_nested_groupby_row_dimension_shape(self, df):
         r = flextab(
-            data=df, groupby=["sex", "region"], measure="income",
+            data=df,
+            groupby=["sex", "region"],
+            measure="income",
             table="sex*region, income=''*N",
         )
         # every distinct (sex, region) combo present in the data should be a row
@@ -349,7 +417,9 @@ class TestNestedTables:
 
     def test_two_measures_side_by_side(self, df):
         r = flextab(
-            data=df, groupby="sex", measure=["income", "tax"],
+            data=df,
+            groupby="sex",
+            measure=["income", "tax"],
             table="sex, income*MEAN tax*MEAN",
         )
         assert cell(r, ("sex", "1"), ("income", "MEAN")) is not None
@@ -361,11 +431,17 @@ class TestNestedTables:
 # 10. row_header
 # ---------------------------------------------------------------------------
 
+
 class TestRowHeader:
 
     def test_row_header_sets_index_name(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*N", row_header="Sex")
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*N",
+            row_header="Sex",
+        )
         if isinstance(r.index, pd.MultiIndex):
             assert r.index.names[0] == "Sex"
         else:
@@ -375,6 +451,7 @@ class TestRowHeader:
 # ---------------------------------------------------------------------------
 # 11. Error handling
 # ---------------------------------------------------------------------------
+
 
 class TestErrors:
 
@@ -395,6 +472,7 @@ class TestErrors:
 # 12. Result type & export smoke tests
 # ---------------------------------------------------------------------------
 
+
 class TestResultObject:
 
     def test_returns_flextab_result_subclass(self, df):
@@ -403,22 +481,31 @@ class TestResultObject:
         assert isinstance(r, pd.DataFrame)
 
     def test_values_stay_numeric_for_further_computation(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*SUM")
+        r = flextab(
+            data=df, groupby="sex", measure="income", table="sex, income=''*SUM"
+        )
         assert r["SUM"].sum() == pytest.approx(df["income"].sum())
 
     def test_to_excel_writes_a_file(self, df, tmp_path):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(N MEAN)",
-                    style={"header_bg": "#4472C4", "header_fg": "white"})
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*(N MEAN)",
+            style={"header_bg": "#4472C4", "header_fg": "white"},
+        )
         out_path = tmp_path / "out.xlsx"
         r.to_excel(out_path)
         assert out_path.exists()
         assert out_path.stat().st_size > 0
 
     def test_repr_html_runs_without_error(self, df):
-        r = flextab(data=df, groupby="sex", measure="income",
-                    table="sex, income=''*(N MEAN)",
-                    style={"cell_bg": ("white", "#EBF3FB")})
+        r = flextab(
+            data=df,
+            groupby="sex",
+            measure="income",
+            table="sex, income=''*(N MEAN)",
+            style={"cell_bg": ("white", "#EBF3FB")},
+        )
         html = r._repr_html_()
         assert "<table" in html

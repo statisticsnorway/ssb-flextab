@@ -7,10 +7,8 @@ maintainers = [{ name = "Statistics Norway, IT-Architecture Department (702)" }]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.12"
-dynamic = ["classifiers"]
 dependencies = [
     "click>=8.0.1",
-    "pytest (>=9.1.1,<10.0.0)",
 ]
 
 [project.urls]
@@ -28,6 +26,7 @@ lint = [
     "pre-commit>=4.4.0",
     "pre-commit-hooks>=6.0.0",
     "pydoclint>=0.8.3",
+    "pytest>=9.1.1,<10.0.0",
     "ruff>=0.14.5",
 ]
 doc = [
@@ -162,9 +161,9 @@ classmethod-decorators = ["classmethod", "validator", "root_validator", "pydanti
 [tool.uv]
 exclude-newer = "7 days"
 
-# [tool.uv.build-backend]  # set if module name differs from package name
-# module-name = "ssb-flextab"
+[tool.uv.build-backend]  # set if module name differs from package name
+module-name = "ssb_flextab"
 
 [build-system]
-requires = ["uv_build>=0.11.0,<0.12.0"]
+requires = ["uv_build>=0.12.5,<0.13"]
 build-backend = "uv_build"

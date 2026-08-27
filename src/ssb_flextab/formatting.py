@@ -235,7 +235,11 @@ def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
         "| " + " | ".join(header) + " |",
         "|" + "|".join(["---"] * len(header)) + "|",
     ]
-    for idx_vals, (_, row) in zip(index_rows, formatted.iterrows()):
+    for idx_vals, (_, row) in zip(
+        index_rows,
+        formatted.iterrows(),
+        strict=True,
+    ):
         cells = idx_vals + [_escape(str(v)) for v in row]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)

@@ -121,7 +121,7 @@ class FlextabResult(pd.DataFrame):
             # Access the closure to get the exact formatting parameters
             fvars = formatter.__code__.co_freevars
             fvals = {k: v.cell_contents for k, v in
-                     zip(fvars, formatter.__closure__)}
+                     zip(fvars, formatter.__closure__, strict=True)}
             decimals        = fvals.get("decimals", 0)
             use_thousands   = fvals.get("use_thousands", False)   # _ separator
             use_space_thous = fvals.get("use_space_thous", False) # s separator

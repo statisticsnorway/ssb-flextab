@@ -178,6 +178,7 @@ def _whmean(x, w):
 
 def _clean_weights(weights: pd.Series) -> pd.Series:
     """Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column:
+
     - missing weight  -> NaN (caller must drop these rows entirely)
     - negative weight -> treated as 0 (observation still counted in N)
     - zero / positive -> unchanged
@@ -221,7 +222,8 @@ ALL_STATS = set(_BASE_STATS) | _PERCENT_STATS
 
 def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, weight=None):
     """Compute an aggregated Series for a single (row_spec, col_spec) pair
-    when neither spec carries an ALL/TOTAL token — i.e. both dimensions
+
+    When neither spec carries an ALL/TOTAL token — i.e. both dimensions
     are pure groupby-value breakdowns with no marginal totals.
 
     Parameters
@@ -363,8 +365,7 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
 
 def _compute_all_series(data, groups_to_keep, var, stat, missing,
                         r_groups=None, c_groups=None, weight=None):
-    """Compute an aggregated Series for a spec that involves an ALL/TOTAL
-    marginal total in at least one dimension.
+    """Compute an aggregated Series involving an ALL/TOTAL margin.
 
     This handles the three ALL cases:
       - ALL on rows only  (has_all_r=True,  has_all_c=False)
@@ -517,8 +518,9 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
     return 100.0 * series / grand
 
 def _parse_denom_def(denom_str: str) -> list[str]:
-    """Parse the content of a <...> denominator definition into an ordered
-    list of uppercase token strings.
+    """Parse the content of a <...> denominator definition.
+    
+    Into an ordered list of uppercase token strings.
 
     Each token is one of:
       - An uppercase measure variable name (e.g. 'INCOME')

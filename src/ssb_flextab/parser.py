@@ -244,9 +244,7 @@ class _Parser:
         raise SyntaxError(f"Unexpected token: {t}")
 
     def _consume_fmt(self) -> str | None:
-        """Consume and return a FMT token immediately following the current
-        position (skipping a single space), or return None.
-        """
+        """Consume and return a FMT token"""
         p = self.pos
         # Allow one optional space between token and format=
         if p < len(self.tokens) and self.tokens[p][0] == "SP":
@@ -257,7 +255,9 @@ class _Parser:
         return None
 
     def _consume_denom(self) -> str | None:
-        """Consume and return a DENOM token (e.g. the 'income' from
+        """Consume and return a DENOM token
+        
+        (e.g. the 'income' from
         pctsum<income>) immediately after the current position, or None.
         """
         p = self.pos
@@ -345,7 +345,9 @@ def _expand_node(node: DimNode) -> list[list[DimNode]]:
 
 
 def _expand_node_with_branch(node: DimNode):
-    """Like _expand_node, but additionally returns a top-level branch index for
+    """Like _expand_node.
+    
+    But additionally returns a top-level branch index for
     each path, used to order specs that come from a TOP-LEVEL concatenation
     (space-separated dimension root) in written left-to-right order.
 

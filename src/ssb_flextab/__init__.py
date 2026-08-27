@@ -1,3 +1,5 @@
+"""Tools for creating flexible summary tables with pandas."""
+
 from .flextab import flextab
 from .formatting import flextab_to_markdown
 from .formatting import flextab_to_string

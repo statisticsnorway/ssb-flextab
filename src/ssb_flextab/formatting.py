@@ -78,8 +78,7 @@ def _parse_fmt_spec(spec: str):
     return _fmt
 
 def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
-    """Build a string-valued copy of result with per-column AND per-row formats
-    applied.
+    """Build a string-valued copy of result with per-column AND per-row formats applied.
 
     A format= spec can appear on either the row or the column dimension of
     the TABLE expression (e.g. "n*format=6,0 rowpctn*format=7,1, ..." puts
@@ -149,10 +148,12 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
 
 
 def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
-    """Render a flextab() result as a plain Markdown table, with flattened,
-    human-readable column headers instead of the raw index tuples that
-    pandas' inherited DataFrame.to_markdown() shows for a MultiIndex, and
-    with format= specs from the TABLE expression applied to the numbers.
+    """Render a flextab() result as a plain Markdown table.
+    
+    The table contains flattened, human-readable column headers instead of 
+    the raw index tuples that pandas' inherited DataFrame.to_markdown()
+    shows for a MultiIndex, and with format= specs from the TABLE expression
+    applied to the numbers.
 
     Standard Markdown tables can't merge cells (no colspan/rowspan) and
     can't stack more than one header row, so the nested, visually "merged"

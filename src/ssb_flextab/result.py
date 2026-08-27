@@ -41,6 +41,7 @@ class FlextabResult(pd.DataFrame):
     @staticmethod
     def _to_hex(color) -> str:
         """Normalise a colour specification to a 6-character uppercase hex string
+
         (no '#' prefix) suitable for openpyxl and CSS.
 
         Accepts:
@@ -163,8 +164,10 @@ class FlextabResult(pd.DataFrame):
         return self.__repr__()
 
     def _repr_html_(self):
-        """Jupyter/IPython HTML display with format= specs AND inline CSS
-        colours from the style= parameter applied.
+        """Jupyter/IPython HTML display
+        
+        With format= specs AND inline CSS colours from the style= parameter
+        applied.
 
         Style keys and what they colour (see flextab()'s style= docstring
         for the full picture):
@@ -316,7 +319,6 @@ class FlextabResult(pd.DataFrame):
 
     def to_excel(self, excel_writer, sheet_name="Sheet1", **kwargs):
         """Write to an Excel file with number formatting and colour styling
-        preserved via openpyxl post-processing.
 
         Parameters
         ----------

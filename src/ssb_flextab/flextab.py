@@ -530,18 +530,21 @@ def flextab(
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
     def _index_value_key(orig_col, v):
-        """Sort key for sort_by='index': order by each value's POSITION in the
-        labels dict as written by the caller (dict insertion order).
+        """Return the sort key for ``sort_by='index'``.
 
-        Looks up v ONLY in labels[orig_col] (the dict belonging to this
-        specific groupby column), never in other columns' label dicts, so
-        a raw value like 1 used in two different columns can never borrow
-        the wrong column's label/order.
+        Order values by their position in the labels dictionary, using the
+        insertion order provided by the caller.
 
-        Values not present in the label dict (or when the column has no
-        label dict at all) fall back to their normalised string form,
-        sorted after all explicitly labelled values.
+        Looks up ``v`` only in ``labels[orig_col]`` (the dictionary belonging to
+        this specific groupby column), never in other columns' label dictionaries,
+        so a raw value like 1 used in two different columns can never borrow the
+        wrong column's label or order.
+
+        Values not present in the label dictionary, or when the column has no
+        label dictionary at all, fall back to their normalised string form and
+        are sorted after all explicitly labelled values.
         """
+
         col_labels = _label_map.get(orig_col) if orig_col else None
         if col_labels and v in col_labels:
             keys_in_order = list(col_labels.keys())
@@ -550,6 +553,7 @@ def flextab(
 
     def _label_text_value_key(orig_col, v):
         """Sort key for sort_by='label': order alphabetically by the DISPLAY
+
         LABEL TEXT (the dict's value), not by dict-write order and not by
         the raw code.
 
@@ -558,6 +562,7 @@ def flextab(
         to their normalised string form, sorted after all explicitly
         labelled values.
         """
+
         col_labels = _label_map.get(orig_col) if orig_col else None
         if col_labels and v in col_labels:
             return (0, str(col_labels[v]))
@@ -604,6 +609,7 @@ def flextab(
                    If col_name is None or not in _label_map, no remapping
                    is applied beyond the nan/sentinel handling.
         """
+
         if v is None or v == _NAN_SENTINEL:
             return "nan"
         if isinstance(v, float):
@@ -628,6 +634,7 @@ def flextab(
 
         Returns a list of ints, outermost first.
         """
+
         if not all_path_orders:
             return []
         max_len = max((len(po) for po in all_path_orders), default=0)
@@ -659,6 +666,7 @@ def flextab(
           - group with non-blank label (2 slots): label -> high slot, value -> low slot
           - group with blank label (1 slot): value -> low slot only (label suppressed)
         """
+
         if not path_order:
             return hdr
 
@@ -743,6 +751,7 @@ def flextab(
         Both have D=4; the Subtotal row's trailing '' is kept so 'Asia' aligns
         vertically with 'Asia' in the detail rows (2-slot group positions).
         """
+
         all_po = [hdr_path.get(hdr, ([], 0))[0] for hdr, _ in keys]
         slots  = _compute_slot_layout(all_po)
         D      = sum(slots)
@@ -873,6 +882,7 @@ def _sort_row_keys(row_keys: list, hdr_path: dict | None = None, value_key_fn=No
                    (sort_by='index'), or by the label text itself
                    (sort_by='label').
     """
+    
     hdr_path = hdr_path or {}
 
     def _normalise(v):
@@ -995,10 +1005,12 @@ _NAN_SENTINEL = "__nan__"
 
 def _normalise_key(val):
     """Normalise a group key value so that all missing-value representations
+    
     (float nan, pd.NA, pd.NaT, None) map to a single canonical object.
     This prevents duplicate row/column keys when different aggregation calls
     (e.g. groupby on a column vs .size()) return different NA types.
     """
+
     if val is None:
         return _NAN_SENTINEL
     if val is pd.NA or val is pd.NaT:

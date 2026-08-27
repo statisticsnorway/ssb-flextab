@@ -2488,6 +2488,100 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep="."):
     return _format_dataframe(result, fmt=fmt, na_rep=na_rep).to_string()
 
 
+def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
+    """
+    Render a flextab() result as a plain Markdown table, with flattened,
+    human-readable column headers instead of the raw index tuples that
+    pandas' inherited DataFrame.to_markdown() shows for a MultiIndex, and
+    with format= specs from the TABLE expression applied to the numbers.
+
+    Standard Markdown tables can't merge cells (no colspan/rowspan) and
+    can't stack more than one header row, so the nested, visually "merged"
+    header layout from the notebook display can't be reproduced in a
+    plain Markdown table - not a flextab limitation, a Markdown one. This
+    function's compromise is to flatten every column's levels into ONE
+    readable label per column: a ('SUM', 'Income') heading becomes
+    "SUM / Income" (see `sep`), and blank levels (e.g. a label suppressed
+    with name='') are dropped rather than left as an empty segment.
+
+    If the exact merged-header look is what you need in a document,
+    embed the HTML rendering instead of a Markdown table - most Markdown
+    processors (GitHub, MkDocs, Jupyter Book, Pandoc) pass raw HTML
+    through untouched, colspan and all:
+
+        with open("table.md", "w") as f:
+            f.write(result._repr_html_())
+
+    (Some renderers, GitHub included, strip inline `style` attributes
+    from embedded HTML for security, so `style=` colouring may not
+    survive - the table structure and merged headers still will.)
+
+    Parameters
+    ----------
+    result : FlextabResult
+        The DataFrame returned by flextab().
+
+    fmt : str, default "{:.3f}"
+        Python format string applied to numeric cells that have no
+        per-cell format= spec from the TABLE expression - same behaviour
+        as flextab_to_string().
+
+    na_rep : str, default "."
+        Text shown in place of NaN / missing cells.
+
+    sep : str, default " / "
+        Separator used to join a MultiIndex column's levels into one
+        header label.
+
+    Returns
+    -------
+    str
+        A GitHub-flavoured Markdown table.
+
+    Examples
+    --------
+    print(flextab_to_markdown(r))
+    with open("table.md", "w") as f:
+        f.write(flextab_to_markdown(r, na_rep="-"))
+    """
+    formatted = _format_dataframe(result, fmt=fmt, na_rep=na_rep)
+
+    def _escape(text: str) -> str:
+        # A literal "|" would otherwise break the Markdown table's
+        # column structure.
+        return text.replace("|", "\\|")
+
+    def _flatten(key) -> str:
+        if isinstance(key, tuple):
+            parts = [str(p) for p in key if str(p) != ""]
+            label = sep.join(parts) if parts else ""
+        else:
+            label = str(key)
+        return _escape(label)
+
+    col_labels = [_flatten(c) for c in formatted.columns]
+
+    if isinstance(formatted.index, pd.MultiIndex):
+        index_names = [_escape(n) if n else "" for n in formatted.index.names]
+        index_rows = [
+            [_escape(str(v)) for v in (idx if isinstance(idx, tuple) else (idx,))]
+            for idx in formatted.index
+        ]
+    else:
+        index_names = [_escape(formatted.index.name) if formatted.index.name else ""]
+        index_rows = [[_escape(str(idx))] for idx in formatted.index]
+
+    header = index_names + col_labels
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "|" + "|".join(["---"] * len(header)) + "|",
+    ]
+    for idx_vals, (_, row) in zip(index_rows, formatted.iterrows()):
+        cells = idx_vals + [_escape(str(v)) for v in row]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # 16. FLEXTAB RESULT CLASS (DISPLAY & EXCEL EXPORT)
 # ---------------------------------------------------------------------------
@@ -2997,3 +3091,92 @@ class FlextabResult(pd.DataFrame):
         if buf is not None:
             wb.save(excel_writer)
 
+
+
+
+
+# ---------------------------------------------------------------------------
+# 17. SMOKE TESTS
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    np.random.seed(42)
+    n = 200
+    demo = pd.DataFrame({
+        "origin":     np.random.choice(["Asia", "Europe", "USA"], n),
+        "type":       np.random.choice(["Sedan", "SUV", "Truck"], n),
+        "msrp":       np.random.normal(35000, 12000, n).clip(10000),
+        "horsepower": np.random.normal(220, 60, n).clip(80),
+    })
+
+    sep = "=" * 70
+
+    print(sep)
+    print("Example 1 — 1D, no groupby, stat labels")
+    print(sep)
+    r1 = flextab(
+        data=demo, measure=["msrp", "horsepower"],
+        table="msrp='' * (N MEAN='Average' STD='Std Dev') horsepower='' * (N MEAN='Average')",
+    )
+    print(flextab_to_string(r1))
+
+    print(f"\n{sep}")
+    print("Example 2 — 2D: origin renamed, msrp suppressed")
+    print(sep)
+    r2 = flextab(
+        data=demo, measure=["msrp"], groupby=["origin"],
+        table="origin='Region', msrp='' * (N MEAN='Mean' ROWPCTN='Row %')",
+    )
+    print(flextab_to_string(r2))
+
+    print(f"\n{sep}")
+    print("Example 3 — ALL='Total' in row dimension")
+    print(sep)
+    r3 = flextab(
+        data=demo, measure=["msrp"], groupby=["origin"],
+        table="origin ALL='Total', msrp='' * (N MEAN='Mean' MIN MAX)",
+    )
+    print(flextab_to_string(r3))
+
+    print(f"\n{sep}")
+    print("Example 4 — ALL in both dimensions (grand-total row + col)")
+    print(sep)
+    r4 = flextab(
+        data=demo, measure=["msrp"], groupby=["origin", "type"],
+        table="origin * type ALL='Subtotal', msrp='' * (N MEAN='Mean') ALL='Grand Total'",
+    )
+    print(flextab_to_string(r4))
+
+    print(f"\n{sep}")
+    print("Example 5 — Percent stats with labels")
+    print(sep)
+    r5 = flextab(
+        data=demo, measure=["msrp"], groupby=["origin"],
+        table="origin='Region' ALL='Total', msrp='' * (PCTN='% of Total' COLPCTN='Col %')",
+    )
+    print(flextab_to_string(r5))
+
+    print(f"\n{sep}")
+    print("Example 6 — Nested groupby + ALL subtotal")
+    print(sep)
+    r6 = flextab(
+        data=demo, measure=["msrp", "horsepower"],
+        groupby=["origin", "type"],
+        table="origin * (type ALL='Subtotal'), msrp='' * (N MEAN='Mean') horsepower='' * MEAN='Mean'",
+    )
+    print(flextab_to_string(r6))
+
+    print(f"\n{sep}")
+    print("Example 7 — nan rows: single nan per groupby value")
+    print(sep)
+    demo2 = pd.DataFrame({"origin": ["Asia", None, "USA"], "msrp": [30000, 40000, None]})
+    r7 = flextab(
+        data=demo2, groupby=["origin"], measure=["msrp"],
+        table="origin, msrp*(sum n) n",
+        include_missing_in_groupby=True)
+    print(flextab_to_string(r7))
+    assert len(r7) == 3, f"Expected 3 rows, got {len(r7)}"
+    # Index is now (label, value) tuples e.g. ('origin','nan') — check value level
+    idx_values = [t[-1] if isinstance(t, tuple) else t for t in r7.index]
+    assert idx_values.count("nan") == 1, f"nan should appear exactly once, got: {idx_values}"
+    print("OK: 3 rows, nan appears once")

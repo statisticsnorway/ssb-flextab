@@ -30,7 +30,7 @@ Flextab is a Python package for making *flex*ible *tab*ulation. It is made with 
 
 Flextab is based on the Sas procedure [proc tabulate]( https://documentation.sas.com/doc/en/pgmsascdc/9.4_3.5/proc/n00yutbvvckjwrn1ldg5xkvjy1pu.htm) which again was based on the [tpl language](https://en.wikipedia.org/wiki/TPL_Tables)
 
-It makes tables in two dimensions, rows an columns
+It makes flexible tables in two dimensions, rows an columns
 
 ## Requirements
 
@@ -48,7 +48,7 @@ pip install ssb-flextab
 
 ## Usage
 
-A [Tutorial](demos/tutorial.py) is found in the in the `demos` folder. 
+A [tutorial](docs/flextab_tutorial.md) is found in the in the `docs` folder. 
 
 ## Contributing
 

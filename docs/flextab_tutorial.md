@@ -238,6 +238,14 @@ flextab(
 )
 ```
 
+```text
+ income
+ region
+    nan                        1                        2                         3
+      N NMISS    SUM   MEAN    N NMISS    SUM   MEAN    N NMISS     SUM   MEAN    N NMISS    SUM   MEAN
+    1.0   0.0  300.0  300.0  2.0   0.0  800.0  400.0  5.0   0.0  2200.0  440.0  1.0   1.0  750.0  750.0
+```
+
 This crosses `income`'s statistics with every value of `region`, giving a
 full N / NMISS / SUM / MEAN block per region, all still in a single
 (column) dimension.
@@ -290,6 +298,18 @@ flextab(
 )
 ```
 
+```text
+                        sex
+                        nan    1    2
+region nan education 3    .  1.0    .
+       1   education 2    .    .  1.0
+                     3    .    .  1.0
+       2   education 1    .  2.0    .
+                     2    .  1.0    .
+                     3  1.0    .  1.0
+       3   education 3    .    .  2.0
+```
+
 Nest a second dimension into the columns the same way:
 
 ```python
@@ -302,6 +322,20 @@ flextab(
     sex * age_group
     """
 )
+```
+
+```text
+                             sex
+                             nan         1                   2
+                       age_group age_group           age_group
+                               1         1    2    3       nan    2    3
+region nan education 3         .         .  1.0    .         .    .    .
+       1   education 2         .         .    .    .       1.0    .    .
+                     3         .         .    .    .         .  1.0    .
+       2   education 1         .         .  1.0  1.0         .    .    .
+                     2         .       1.0    .    .         .    .    .
+                     3       1.0         .    .    .         .    .  1.0
+       3   education 3         .         .    .    .         .  2.0    .
 ```
 
 ### Stacking instead of nesting
@@ -319,6 +353,18 @@ flextab(
     sex age_group
     """
 )
+```
+
+```text
+               sex           age_group
+               nan    1    2       nan    1    2    3
+region    nan    .  1.0    .         .    .  1.0    .
+          1      .    .  2.0       1.0    .  1.0    .
+          2    1.0  3.0  1.0         .  2.0  1.0  2.0
+          3      .    .  2.0         .    .  2.0    .
+education 1      .  2.0    .         .    .  1.0  1.0
+          2      .  1.0  1.0       1.0  1.0    .    .
+          3    1.0  1.0  4.0         .  1.0  4.0  1.0
 ```
 
 Now `region` and `education` each get their own independent breakdown in
@@ -380,6 +426,23 @@ flextab(
 )
 ```
 
+```text
+                                  sex
+                           TOTAL  nan    1    2
+                     TOTAL  10.0  1.0  4.0  5.0
+region nan           TOTAL   1.0    .  1.0    .
+           education 3       1.0    .  1.0    .
+       1             TOTAL   2.0    .    .  2.0
+           education 2       1.0    .    .  1.0
+                     3       1.0    .    .  1.0
+       2             TOTAL   5.0  1.0  3.0  1.0
+           education 1       2.0    .  2.0    .
+                     2       1.0    .  1.0    .
+                     3       2.0  1.0    .  1.0
+       3             TOTAL   2.0    .    .  2.0
+           education 3       2.0    .    .  2.0
+```
+
 Each region row now gets its own `TOTAL` sub-row, in addition to the
 overall `TOTAL` at the top.
 
@@ -400,6 +463,26 @@ flextab(
     total sex
     """
 )
+```
+
+```text
+                                    sex
+                             TOTAL  nan    1    2
+       TOTAL           TOTAL  10.0  1.0  4.0  5.0
+             education 1       2.0    .  2.0    .
+                       2       2.0    .  1.0  1.0
+                       3       6.0  1.0  1.0  4.0
+region nan             TOTAL   1.0    .  1.0    .
+             education 3       1.0    .  1.0    .
+       1               TOTAL   2.0    .    .  2.0
+             education 2       1.0    .    .  1.0
+                       3       1.0    .    .  1.0
+       2               TOTAL   5.0  1.0  3.0  1.0
+             education 1       2.0    .  2.0    .
+                       2       1.0    .  1.0    .
+                       3       2.0  1.0    .  1.0
+       3               TOTAL   2.0    .    .  2.0
+             education 3       2.0    .    .  2.0
 ```
 
 ### Totals with a measure column
@@ -478,6 +561,16 @@ flextab(
 )
 ```
 
+```text
+             income
+                  N NMISS  SIZE     SUM MEDIAN   MEAN  GMEAN  HMEAN    MIN    MAX    STD STDERR      VAR     P1    P99 QRANGE
+       TOTAL    9.0   1.0  10.0  4050.0  400.0  450.0  377.8  300.4  100.0  850.0  252.5   84.2  63750.0  108.0  842.0  350.0
+region nan      1.0   0.0   1.0   300.0  300.0  300.0  300.0  300.0  300.0  300.0      .      .        .  300.0  300.0    0.0
+       1        2.0   0.0   2.0   800.0  400.0  400.0  396.9  393.8  350.0  450.0   70.7   50.0   5000.0  351.0  449.0   50.0
+       2        5.0   0.0   5.0  2200.0  400.0  440.0  338.1  247.3  100.0  850.0  311.0  139.1  96750.0  104.0  842.0  450.0
+       3        1.0   1.0   2.0   750.0  750.0  750.0  750.0  750.0  750.0  750.0      .      .        .  750.0  750.0    0.0
+```
+
 | Statistic | Meaning |
 |---|---|
 | `n` | Count of **non-missing** values of the measure |
@@ -518,6 +611,27 @@ flextab(
 )
 ```
 
+```text
+                       region
+                 TOTAL    nan       1        2      3
+income N           9.0    1.0     2.0      5.0    1.0
+       NMISS       1.0    0.0     0.0      0.0    1.0
+       SIZE       10.0    1.0     2.0      5.0    2.0
+       SUM      4050.0  300.0   800.0   2200.0  750.0
+       MEDIAN    400.0  300.0   400.0    400.0  750.0
+       MEAN      450.0  300.0   400.0    440.0  750.0
+       GMEAN     377.8  300.0   396.9    338.1  750.0
+       HMEAN     300.4  300.0   393.8    247.3  750.0
+       MIN       100.0  300.0   350.0    100.0  750.0
+       MAX       850.0  300.0   450.0    850.0  750.0
+       STD       252.5      .    70.7    311.0      .
+       STDERR     84.2      .    50.0    139.1      .
+       VAR     63750.0      .  5000.0  96750.0      .
+       P1        108.0  300.0   351.0    104.0  750.0
+       P99       842.0  300.0   449.0    842.0  750.0
+       QRANGE    350.0    0.0    50.0    450.0    0.0
+```
+
 ## Weighted statistics
 
 Add `weight=` to compute weighted figures. Rows with a **missing** weight
@@ -536,6 +650,29 @@ flextab(
     total region
     """
 )
+```
+
+```text
+                       region
+                 TOTAL    nan       1         2       3
+income N           8.0    1.0     2.0       4.0     1.0
+       NMISS       1.0    0.0     0.0       0.0     1.0
+       SIZE        9.0    1.0     2.0       4.0     2.0
+       SUM     16040.0  450.0  3635.0    8805.0  3150.0
+       MEDIAN    450.0  300.0   350.0     650.0   750.0
+       MEAN      502.8  300.0   367.2     540.2   750.0
+       GMEAN     425.0  300.0   365.4     415.5   750.0
+       HMEAN     332.9  300.0   363.9     280.9   750.0
+       MIN       100.0  300.0   350.0     100.0   750.0
+       MAX       850.0  300.0   450.0     850.0   750.0
+       STD       269.9      .    70.7     347.3       .
+       STDERR     47.8      .    22.5      86.0       .
+       VAR     72847.8      .  5000.0  120642.7       .
+       P1        100.0  300.0   350.0     100.0   750.0
+       P25       350.0  300.0   350.0     200.0   750.0
+       P75       750.0  300.0   350.0     850.0   750.0
+       P99       850.0  300.0   450.0     850.0   750.0
+       QRANGE    400.0    0.0     0.0     650.0     0.0
 ```
 
 A couple of things worth knowing about weighting:
@@ -609,7 +746,21 @@ flextab(
     (rowpctn income * rowpctsum) * (total sex)
     """
 )
+```
 
+```text
+                                            income
+             ROWPCTN                     ROWPCTSUM
+                       sex                           sex
+               TOTAL   nan      1      2     TOTAL   nan      1      2
+       TOTAL   100.0  10.0   40.0   50.0     100.0  16.0   35.8   48.1
+region nan     100.0     .  100.0      .     100.0     .  100.0      .
+       1       100.0     .      .  100.0     100.0     .      .  100.0
+       2       100.0  20.0   60.0   20.0     100.0  29.5   52.3   18.2
+       3       100.0     .      .  100.0     100.0     .      .  100.0
+```
+
+```python
 flextab(
     data=df,
     groupby=["region", "sex"],
@@ -620,6 +771,18 @@ flextab(
     (colpctn income * colpctsum) * (total sex)
     """
 )
+```
+
+```text
+                                             income
+             COLPCTN                      COLPCTSUM
+                        sex                            sex
+               TOTAL    nan      1      2     TOTAL    nan      1      2
+       TOTAL   100.0  100.0  100.0  100.0     100.0  100.0  100.0  100.0
+region nan      10.0      .   25.0      .       7.4      .   20.7      .
+       1        20.0      .      .   40.0      19.8      .      .   41.0
+       2        50.0  100.0   75.0   20.0      54.3  100.0   79.3   20.5
+       3        20.0      .      .   40.0      18.5      .      .   38.5
 ```
 
 Percentages respect `weight=` too, just like any other statistic:
@@ -636,6 +799,18 @@ flextab(
     (colpctn income * colpctsum) * (total sex)
     """
 )
+```
+
+```text
+                                             income
+             COLPCTN                      COLPCTSUM
+                        sex                            sex
+               TOTAL    nan      1      2     TOTAL    nan      1      2
+       TOTAL   100.0  100.0  100.0  100.0     100.0  100.0  100.0  100.0
+region nan      11.1      .   25.0      .       2.8      .    8.5      .
+       1        22.2      .      .   50.0      22.7      .      .   53.6
+       2        44.4  100.0   75.0      .      54.9  100.0   91.5      .
+       3        22.2      .      .   50.0      19.6      .      .   46.4
 ```
 
 ### Custom denominators
@@ -657,6 +832,26 @@ flextab(
     (total education)*pctn<region>
     """
 )
+```
+
+```text
+                              education
+                        TOTAL         1      2      3
+                         PCTN      PCTN   PCTN   PCTN
+    TOTAL        TOTAL  100.0     100.0  100.0  100.0
+          region nan     10.0         .      .   16.7
+                 1       20.0         .   50.0   16.7
+                 2       50.0     100.0   50.0   33.3
+                 3       20.0         .      .   33.3
+sex nan          TOTAL  100.0         .      .  100.0
+          region 2      100.0         .      .  100.0
+    1            TOTAL  100.0     100.0  100.0  100.0
+          region nan     25.0         .      .  100.0
+                 2       75.0     100.0  100.0      .
+    2            TOTAL  100.0         .  100.0  100.0
+          region 1       40.0         .  100.0   25.0
+                 2       20.0         .      .   25.0
+                 3       40.0         .      .   50.0
 ```
 
 **A measure column as denominator.** Here `tax` is expressed as a
@@ -909,7 +1104,18 @@ flextab(
     labels=labels,
     sort_by="label"
 )
+```
 
+```text
+                   TOTAL Central   East  West   nan
+Education
+TOTAL              100,0    18,5   54,3  19,8   7,4
+Elementary school  100,0       .  100,0     .     .
+Higher education   100,0    29,4   41,2  17,6  11,8
+Secondary school   100,0       .   22,2  77,8     .
+```
+
+```python
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -923,6 +1129,15 @@ flextab(
     labels=labels,
     sort_by="index"
 )
+```
+
+```text
+                   TOTAL  West   East Central   nan
+Education
+TOTAL              100,0  19,8   54,3    18,5   7,4
+Higher education   100,0  17,6   41,2    29,4  11,8
+Secondary school   100,0  77,8   22,2       .     .
+Elementary school  100,0     .  100,0       .     .
 ```
 
 With `sort_by="index"`, `region` follows the order it was written in
@@ -957,6 +1172,15 @@ flextab(
 )
 ```
 
+```text
+                   TOTAL  West   East Central   nan
+Education
+TOTAL              100,0  19,8   54,3    18,5   7,4
+Higher education   100,0  17,6   41,2    29,4  11,8
+Secondary school   100,0  77,8   22,2       -     -
+Elementary school  100,0     -  100,0       -     -
+```
+
 **This is worth knowing before you use it:** `na_rep=` on `flextab()`
 itself doesn't just change how missing cells are *displayed* — it
 converts the whole result to `object` dtype and writes the replacement
@@ -972,17 +1196,32 @@ instead when you render it:
 ```python
 tab = flextab(data=df, groupby=["region", "sex"], table="region , sex")
 
-tab.sum().sum()  # 10.0 - still numeric, works fine
+tab.sum().sum()
+```
 
-print(flextab_to_string(tab, na_rep="MISSING"))  # custom marker, display only
+```text
+10.0
+```
+
+```python
+print(flextab_to_string(tab, na_rep="MISSING"))
+```
+
+```text
+                sex
+                nan        1        2
+region nan  MISSING    1.000  MISSING
+       1    MISSING  MISSING    2.000
+       2      1.000    3.000    1.000
+       3    MISSING  MISSING    2.000
 ```
 
 ## Styling
 
-`style=` accepts a dictionary of colors that get applied when the table
+`style=` accepts a dictionary of colours that get applied when the table
 renders in a notebook and when it's exported to Excel:
 
-| Key | Colors |
+| Key | Colours |
 |---|---|
 | `header_bg` / `header_fg` | Background / text colour for the column header cells |
 | `row_bg` / `row_fg` | Background / text colour for the row index cells |
@@ -1025,6 +1264,20 @@ flextab(
 )
 ```
 
+```text
+                     SUM
+                  Income    Tax Tax %
+Education
+TOTAL              4 050  1 440  35,6
+Higher education   2 550  1 190  46,7
+Secondary school     450    160  35,6
+Elementary school  1 050     90   8,6
+```
+
+(The values are identical to the unstyled version above — `style=` only
+changes colours in the notebook display and Excel export, which plain
+text obviously can't show here.)
+
 Each colour key only affects the cells it names — an unset key never
 inherits colour from a neighbouring one, so it's safe to set just the
 keys you care about and leave the rest unstyled.
@@ -1042,7 +1295,11 @@ calculation — work exactly as they would on a plain DataFrame:
 
 ```python
 tab = flextab(data=df, groupby="sex", measure="income", table="sex, income=''*SUM")
-tab["SUM"].sum()  # 4050.0
+tab["SUM"].sum()
+```
+
+```text
+4050.0
 ```
 
 (The one exception is if you pass `na_rep=` to `flextab()` itself — see
@@ -1056,6 +1313,13 @@ with different settings any time, without rebuilding the table:
 
 ```python
 flextab_to_string(tab, fmt="{:.0f}", na_rep="n/a")
+```
+
+```text
+          SUM
+sex nan   650
+    1    1450
+    2    1950
 ```
 
 This is the function to reach for when you want a plain string to `print`
@@ -1087,45 +1351,83 @@ tab = flextab(
     style=tabstyle
 )
 
-excel_filename = "../../reports/tab1.xlsx"
+excel_filename = "../reports/tab1.xlsx"
 tab.to_excel(excel_filename)
 ```
 
 ### To Markdown
 
 Because it's a plain DataFrame under the hood, the standard
-`.to_markdown()` also works:
+`.to_markdown()` also works — but it's not flextab-aware:
 
 ```python
-tab = flextab(
-    data=df,
-    groupby=["education", "sex"],
-    measure=["income", "tax"],
-    table="""
-    (total education='') * (total sex='')
-    ,
-    sum * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
-    """,
-    row_header="Education",
-    include_missing_in_groupby=False,
-    labels=labels,
-    sort_by="index",
-    style=tabstyle
-)
-
-tab_md = tab.to_markdown()
-
-markdown_filename = "../../reports/tab1.md"
-with open(markdown_filename, "w", encoding="utf-8") as f:
-    f.write(tab_md)
+tab.to_markdown()
 ```
 
-Keep in mind `.to_markdown()` is plain pandas, not flextab-aware: it
-prints the raw column-header tuples (e.g. `('SUM', 'Income')`) rather than
-the nicely merged headers you see in a notebook, and it ignores any
-`format=` decimal/thousands settings — you get pandas' default numeric
-formatting instead. It's a convenient plain-text export, not a substitute
-for the notebook or Excel rendering.
+```text
+| Education         |   ('SUM', 'Income') |   ('SUM', 'Tax') |   ('', 'Tax %') |
+|:------------------|---------------------:|------------------:|-----------------:|
+| TOTAL             |                 4050 |              1440 |         35.5556  |
+| Higher education  |                 2550 |              1190 |         46.6667  |
+| Secondary school  |                  450 |               160 |         35.5556  |
+| Elementary school |                 1050 |                90 |          8.57143 |
+```
+
+Two problems: it prints raw column-header tuples like `('SUM', 'Income')`
+instead of anything readable, and it ignores `format=` entirely, falling
+back to pandas' own default number formatting.
+
+Neither problem is really about `.to_markdown()` being careless, though
+— it comes down to a real limitation of Markdown tables themselves:
+**standard Markdown has no way to merge cells (no `colspan`/`rowspan`)
+and no way to stack more than one header row.** The nested, visually
+"merged" header layout you see in a notebook simply can't be expressed
+in a plain Markdown table — there's nowhere to put it.
+
+There are two practical ways around that, depending on what you need:
+
+**Option 1 — a genuine plain-Markdown table, with flattened headers.**
+`flextab_to_markdown()` fixes both problems above without trying to fake
+cell-merging: it applies `format=` the same way `flextab_to_string()`
+does, and flattens each column's levels into one readable label joined
+by `sep` (default `" / "`), dropping blank levels along the way:
+
+```python
+from ssb_flextab.flextab import flextab_to_markdown
+
+flextab_to_markdown(tab)
+```
+
+```text
+| Education | SUM / Income | SUM / Tax | Tax % |
+|---|---|---|---|
+| TOTAL | 4 050 | 1 440 | 35,6 |
+| Higher education | 2 550 | 1 190 | 46,7 |
+| Secondary school | 450 | 160 | 35,6 |
+| Elementary school | 1 050 | 90 | 8,6 |
+```
+
+That's a real Markdown table — it'll render correctly anywhere, and the
+numbers use the same formatting you'd see in the notebook. It just can't
+visually merge "SUM" over two columns the way the notebook display does;
+that header level is folded into each column's label instead.
+
+**Option 2 — embed the actual HTML for an exact merged-header look.**
+If you need the table to look *exactly* like the notebook render —
+merged headers and all — write out the HTML instead of a Markdown table.
+Most Markdown processors (GitHub, GitLab, MkDocs, Jupyter Book, Pandoc)
+pass raw HTML straight through untouched:
+
+```python
+markdown_filename = "../reports/tab1.md"
+with open(markdown_filename, "w", encoding="utf-8") as f:
+    f.write(tab._repr_html_())
+```
+
+This keeps the real `colspan`-merged header structure. The one caveat:
+some renderers — GitHub included — strip inline `style` attributes from
+embedded HTML for security, so a `style=` colour scheme may not survive
+even though the table structure and merged headers will.
 
 ## Quick reference
 
@@ -1153,5 +1455,5 @@ for the notebook or Excel rendering.
 | Change the blank-cell marker (baked into the data) | `flextab(..., na_rep='-')` |
 | Render as a plain string with custom formatting | `flextab_to_string(result, fmt=..., na_rep=...)` |
 | Do further math with the result | just use it — it's a real DataFrame |
-| Color the table | `style={...}` |
+| Colour the table | `style={...}` |
 | Save the table | `.to_excel(path)` / `.to_markdown()` |

@@ -648,3 +648,12 @@ tab_md = tab.to_markdown()
 markdown_filename="../reports/tab1.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab_md)
+
+# %% [markdown]
+# When we use `_repr_html`, the table will be rendered as html and the layout will be kept.
+
+# %%
+from ssb_flextab.flextab import flextab_to_markdown
+markdown_filename = "../reports/tab1b.md"
+with open(markdown_filename, "w", encoding="utf-8") as f:
+    f.write(tab._repr_html_())

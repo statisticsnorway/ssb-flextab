@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .formatting import _format_dataframe
 
 class FlextabResult(pd.DataFrame):
     """
@@ -509,37 +510,3 @@ class FlextabResult(pd.DataFrame):
         if buf is not None:
             wb.save(excel_writer)
 
-def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
-    """
-    Build a string-valued copy of result with per-column AND per-row formats
-    applied.
-
-    A format= spec can appear on either the row or the column dimension of
-    the TABLE expression (e.g. "n*format=6,0 rowpctn*format=7,1, ..." puts
-    the format on the row stat instead of a column stat). For each cell,
-    the column's format (result.attrs["col_fmt_map"]) takes precedence if
-    present; otherwise the row's format (result.attrs["row_fmt_map"]) is
-    used; otherwise the default fmt string applies.
-    """
-    col_fmt_map = result.attrs.get("col_fmt_map", {})
-    row_fmt_map = result.attrs.get("row_fmt_map", {})
-
-    def fmt_val(v, row_pos, col_pos):
-        if pd.isna(v):
-            return na_rep
-        formatter = col_fmt_map.get(col_pos) or row_fmt_map.get(row_pos)
-        if formatter is not None:
-            return formatter(v)
-        try:
-            return fmt.format(float(v))
-        except Exception:
-            return str(v)
-
-    n_rows, n_cols = result.shape
-    data = {
-        j: [fmt_val(result.iat[i, j], i, j) for i in range(n_rows)]
-        for j in range(n_cols)
-    }
-    formatted = pd.DataFrame(data, index=result.index)
-    formatted.columns = result.columns
-    return formatted

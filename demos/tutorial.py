@@ -3,22 +3,8 @@
 
 # %%
 import pandas as pd
-import sys
-from pathlib import Path
 
-# Fungerer både i VS Code og JupyterLab
-try:
-    project_root = Path(__file__).resolve().parent.parent
-except NameError:
-    # JupyterLab
-    project_root = Path.cwd().parent
-
-src_path = project_root / "src"
-
-if src_path.exists():
-    sys.path.append(str(src_path))
-    
-from ssb_flextab.flextab import flextab, flextab_to_string, FlextabResult
+from ssb_flextab import FlextabResult, flextab, flextab_to_string
 
 # %% [markdown]
 # ## Data set for tutorial

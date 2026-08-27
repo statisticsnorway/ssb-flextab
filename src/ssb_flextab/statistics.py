@@ -550,9 +550,9 @@ def _compute_custom_pct(
     groupby: list,
     measure: list,
     missing: bool,
-    weight: str = None,
-    r_path_order: list = None,
-    c_path_order: list = None,
+    weight: str | None = None,
+    r_path_order: list | None = None,
+    c_path_order: list | None = None,
 ) -> pd.Series:
     """Compute a percentage statistic with a user-defined denominator.
 

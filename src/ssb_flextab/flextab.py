@@ -199,17 +199,17 @@ _SENTINEL = "__total__"
 
 def flextab(
     data: pd.DataFrame,
-    measure: str | list = None,
-    groupby: str | list = None,
-    table: str = None,
+    measure: str | list | None = None,
+    groupby: str | list | None = None,
+    table: str | None = None,
     include_missing_in_groupby: bool = True,
     fmt: str = "{:.1f}",
-    na_rep: str = None,
-    labels: dict = None,
+    na_rep: str | None = None,
+    labels: dict | None = None,
     sort_by: str = 'code',
-    weight: str = None,
-    row_header: str = None,
-    style: dict = None,
+    weight: str | None = None,
+    row_header: str | None = None,
+    style: dict | None = None,
 ) -> pd.DataFrame:
     """Build a cross-tabulation table, equivalent to SAS PROC TABULATE.
 
@@ -825,7 +825,7 @@ def flextab(
 
     return result
 
-def _sort_row_keys(row_keys: list, hdr_path: dict = None, value_key_fn=None) -> list:
+def _sort_row_keys(row_keys: list, hdr_path: dict | None = None, value_key_fn=None) -> list:
     """Re-order row/column keys to follow the TABLE expression's written order.
 
     Two ordering rules combine, applied in this priority:

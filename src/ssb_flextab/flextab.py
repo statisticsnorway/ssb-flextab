@@ -675,8 +675,6 @@ def flextab(
         # Slots used by THIS spec's path_order positions
         my_slots = slots[-len(path_order):]   # align from bottom
         my_D = sum(my_slots)
-        # Offset: how many bottom-slots this spec doesn't use (front-pad)
-        offset = D - my_D
 
         def slot_range(local_pos):
             # local_pos is the index within path_order (0 = outermost of THIS spec)
@@ -700,7 +698,6 @@ def flextab(
                 else:
                     val     = next(data_iter, None)
                     val_str = _fmt_val(val, col_name=orig_name)
-                    is_last = (pos == group_slots_pos[-1])
                     global_pos = len(slots) - len(path_order) + pos
                     has_label_slot = (slots[global_pos] == 2)
                     # In the 2-slot system, every group position has a dedicated

@@ -123,7 +123,6 @@ class FlextabResult(pd.DataFrame):
             fvals = {k: v.cell_contents for k, v in
                      zip(fvars, formatter.__closure__)}
             decimals        = fvals.get("decimals", 0)
-            use_comma       = fvals.get("use_comma", False)       # decimal comma
             use_thousands   = fvals.get("use_thousands", False)   # _ separator
             use_space_thous = fvals.get("use_space_thous", False) # s separator
 

@@ -495,7 +495,6 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         if r_groups:
             denom = _agg(r_groups, raw_wfunc)  # total per row group
             def _row_denom(idx):
-                n_c_ctx = len(groups_to_keep) - len(r_groups)
                 if isinstance(idx, tuple):
                     key = idx[:len(r_groups)]
                 else:

@@ -824,7 +824,7 @@ def flextab(
     # Apply row_header: name the row index so it prints as a column label
     if row_header is not None:
         if isinstance(result.index, pd.MultiIndex):
-            result.index.names = [row_header] + list(result.index.names[1:])
+            result.index.names = [row_header, *result.index.names[1:]]
         else:
             result.index.name = row_header
 
@@ -987,7 +987,7 @@ def _sort_row_keys(row_keys: list, hdr_path: dict = None, value_key_fn=None) -> 
             else:
                 ordinal = label_order.get(branch, {}).get(i, {}).get(entry[1], 0)
                 parts.append((ordinal,))
-        return (branch,) + tuple(parts)
+        return (branch, *parts)
 
     return sorted(row_keys, key=sort_key)
 

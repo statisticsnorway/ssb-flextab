@@ -625,11 +625,15 @@ def _compute_custom_pct(
             return pd.Series({"__total__": len(data)})
 
     def _norm_for_lookup(v):
-        if v is None: return "__nan__"
+        if v is None:
+            return "__nan__"
         try:
-            if isinstance(v, float) and np.isnan(v): return "__nan__"
-        except (TypeError, ValueError): pass
-        if v is pd.NA or v is pd.NaT: return "__nan__"
+            if isinstance(v, float) and np.isnan(v):
+                return "__nan__"
+        except (TypeError, ValueError):
+            pass
+        if v is pd.NA or v is pd.NaT:
+            return "__nan__"
         return v
 
     def _norm_lookup_key(k):

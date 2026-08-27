@@ -671,9 +671,6 @@ def flextab(
 
         row = [""] * D
 
-        # Slots used by THIS spec's path_order positions
-        my_slots = slots[-len(path_order):]   # align from bottom
-
         def slot_range(local_pos):
             # local_pos is the index within path_order (0 = outermost of THIS spec)
             # map to the global slots list (bottom-aligned)

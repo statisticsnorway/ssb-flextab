@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pandas as pd
 
@@ -81,7 +81,7 @@ class FlextabResult(pd.DataFrame):
         )
 
     @staticmethod
-    def _resolve_color(spec, idx: int):
+    def _resolve_color(spec, idx: int) -> Any | list[Any] | tuple[Any, ...] | None:
         """Resolve a style-dict colour spec for row/band index `idx`.
 
         Every style key (header_bg/fg, row_bg/fg, row_header_bg/fg,
@@ -153,7 +153,7 @@ class FlextabResult(pd.DataFrame):
 
     # ── Display ───────────────────────────────────────────────────────────
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return the formatted string representation of the result."""
         try:
             fmt = self.attrs.get("default_fmt", "{:.1f}")
@@ -161,7 +161,7 @@ class FlextabResult(pd.DataFrame):
         except Exception:
             return super().__repr__()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return the result as a formatted string."""
         return self.__repr__()
 
@@ -319,7 +319,7 @@ class FlextabResult(pd.DataFrame):
 
     # ── Excel export ──────────────────────────────────────────────────────
 
-    def to_excel(self, excel_writer, sheet_name="Sheet1", **kwargs):
+    def to_excel(self, excel_writer, sheet_name="Sheet1", **kwargs: Any) -> None:
         """Write to an Excel file with number formatting and colour styling.
 
         Parameters

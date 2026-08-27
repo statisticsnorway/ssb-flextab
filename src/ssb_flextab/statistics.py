@@ -54,9 +54,6 @@ _BASE_STATS: dict[str, Callable] = {
     "HMEAN":  lambda x: _hmean(x),
 }
 
-# ---------------------------------------------------------------------------
-# 2. WEIGHTED STATISTICS  (used when weight= is supplied to flextab())
-# ---------------------------------------------------------------------------
 # Each function signature: (values: pd.Series, weights: pd.Series) -> float.
 #
 # Key design decisions:

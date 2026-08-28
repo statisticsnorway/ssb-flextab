@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from numbers import Real
 
 import numpy as np
 import pandas as pd
@@ -141,12 +142,18 @@ def _wvar(
     return (wsum / denom) * numerator
 
 
-def _wstd(x, w):
+def _wstd(
+    x: pd.Series,
+    w: pd.Series,
+):
     v = _wvar(x, w)
     return np.sqrt(v) if pd.notna(v) else np.nan
 
 
-def _wstderr(x, w):
+def _wstderr(
+    x: pd.Series,
+    w: pd.Series,
+):
     # Standard error of the weighted mean: SD_w / sqrt(sum w)
     x, w = _drop_nan_x(x, w)
     v = _wvar(x, w)
@@ -154,7 +161,11 @@ def _wstderr(x, w):
     return np.sqrt(v / wsum) if pd.notna(v) and wsum else np.nan
 
 
-def _wpercentile(x, w, q):
+def _wpercentile(
+    x: pd.Series,
+    w: pd.Series,
+    q: float,
+    ):
     """Weighted percentile via linear interpolation on the weighted ECDF."""
     x, w = _drop_nan_x(x, w)
     if len(x) == 0 or w.sum() == 0:
@@ -169,7 +180,10 @@ def _wpercentile(x, w, q):
     return xs[idx]
 
 
-def _wgmean(x, w):
+def _wgmean(
+    x: pd.Series,
+    w: pd.Series,
+    ):
     # Weighted geometric mean: exp( (sum w*ln x) / (sum w) )
     x, w = _drop_nan_x(x, w)
     mask = x > 0
@@ -182,7 +196,10 @@ def _wgmean(x, w):
     return np.exp((ww * np.log(xw)).sum() / wsum)
 
 
-def _whmean(x, w):
+def _whmean(
+    x: pd.Series,
+    w: pd.Series,
+    ):
     # Weighted harmonic mean: (sum w) / (sum w/x)
     x, w = _drop_nan_x(x, w)
     mask = x != 0
@@ -246,8 +263,15 @@ ALL_STATS = set(_BASE_STATS) | _PERCENT_STATS
 
 
 def _compute_series(
-    data, all_groups, var, stat, r_groups, c_groups, missing, weight=None
-):
+    data: pd.DataFrame,
+    all_groups: list[str],
+    var: str | None,
+    stat: str,
+    r_groups: list[str],
+    c_groups: list[str],
+    missing: bool,
+    weight: str | None = None,
+) -> pd.Series:
     """Compute an aggregated Series for a single (row_spec, col_spec) pair.
 
     When neither spec carries an ALL/TOTAL token — i.e. both dimensions
@@ -291,12 +315,16 @@ def _compute_series(
         data = data[data[weight].notna()].copy()
         data[weight] = _clean_weights(data[weight])
 
-    def _agg(groups, func, wfunc=None):
+    def _agg(
+        groups: list[str],
+        func: Callable[[pd.Series], float],
+        wfunc: Callable[[pd.Series, pd.Series], float] | None = None,
+    ) -> pd.Series:
         if var is not None:
             if weight is not None and wfunc is not None:
                 cols = [var, weight]
 
-                def _apply(g):
+                def _apply(g: pd.DataFrame)-> float:
                     return wfunc(g[var], g[weight])
 
                 if groups:
@@ -315,7 +343,10 @@ def _compute_series(
                 return data.groupby(groups, dropna=dropna).size().rename(None)
             return pd.Series({"__total__": len(data)})
 
-    def _grand(func, wfunc=None):
+    def _grand(
+        func: Callable[[pd.Series], float],
+        wfunc: Callable[[pd.Series, pd.Series], float] | None = None,
+    ) -> float | int:
         if var is not None:
             if weight is not None and wfunc is not None:
                 return wfunc(data[var], data[weight])
@@ -362,7 +393,7 @@ def _compute_series(
             denom = _agg(r_groups, raw_func, raw_wfunc)
             n_r = len(r_groups)
 
-            def row_pct(val, idx):
+            def row_pct(val: int | float, idx: object) -> float:
                 key = idx[:n_r] if isinstance(idx, tuple) else (idx,)
                 key = key[0] if len(key) == 1 else key
                 d = denom.get(key, np.nan)
@@ -379,7 +410,7 @@ def _compute_series(
             denom = _agg(c_groups, raw_func, raw_wfunc)
             n_r = len(r_groups)
 
-            def col_pct(val, idx):
+            def col_pct(val: int | float, idx: object) -> float:
                 if isinstance(idx, tuple):
                     key = idx[n_r : n_r + len(c_groups)]
                 else:
@@ -398,8 +429,15 @@ def _compute_series(
 
 
 def _compute_all_series(
-    data, groups_to_keep, var, stat, missing, r_groups=None, c_groups=None, weight=None
-):
+    data: pd.DataFrame,
+    groups_to_keep: list[str],
+    var: str | None,
+    stat: str,
+    missing: bool,
+    r_groups: list[str] | None = None,
+    c_groups: list[str] | None = None,
+    weight: str | None = None,
+) -> pd.Series:
     """Compute an aggregated Series involving an ALL/TOTAL margin.
 
     This handles the three ALL cases:
@@ -441,12 +479,15 @@ def _compute_all_series(
         data = data[data[weight].notna()].copy()
         data[weight] = _clean_weights(data[weight])
 
-    def _agg(groups, wfunc=None):
+    def _agg(
+        groups: list[str],
+        wfunc: Callable[[pd.Series, pd.Series], float] | None = None,
+    ):
         if var is not None:
             if weight is not None and wfunc is not None:
                 cols = [var, weight]
 
-                def _apply(g):
+                def _apply(g: pd.DataFrame) -> float:
                     return wfunc(g[var], g[weight])
 
                 if groups:
@@ -509,7 +550,7 @@ def _compute_all_series(
         if c_groups:
             denom = _agg(c_groups, raw_wfunc)  # total per column group
 
-            def _col_denom(idx):
+            def _col_denom(idx: object) -> Real:
                 # idx is from groups_to_keep = r_context + c_groups
                 # c_groups part starts after r_context groups
                 n_r_ctx = len(groups_to_keep) - len(c_groups)
@@ -520,7 +561,7 @@ def _compute_all_series(
                 key = key[0] if len(key) == 1 else key
                 return denom.get(key, np.nan)
 
-            def _safe_pct(val, denom_val):
+            def _safe_pct(val: int | float, denom_val: int | float) -> float:
                 if denom_val is np.nan or denom_val == 0:
                     return np.nan
                 return 100.0 * val / denom_val
@@ -539,7 +580,7 @@ def _compute_all_series(
         if r_groups:
             denom = _agg(r_groups, raw_wfunc)  # total per row group
 
-            def _row_denom(idx):
+            def _row_denom(idx: object) -> float:
                 if isinstance(idx, tuple):
                     key = idx[: len(r_groups)]
                 else:
@@ -547,8 +588,8 @@ def _compute_all_series(
                 key = key[0] if len(key) == 1 else key
                 return denom.get(key, np.nan)
 
-            def _safe_row_pct(val, denom_val):
-                if denom_val is np.nan or denom_val == 0:
+            def _safe_row_pct(val: float, denom_val: int | float) -> float:
+                if np.isnan(denom_val) or denom_val == 0:
                     return np.nan
                 return 100.0 * val / denom_val
 
@@ -651,7 +692,7 @@ def _compute_custom_pct(
     all_groups = list(dict.fromkeys(r_groups + c_groups))
     dropna = not missing
 
-    def _agg_series(groups, var_col):
+    def _agg_series(groups: list[str], var_col: str | None) -> pd.Series:
         if var_col is not None:
             if weight is not None:
                 # Weighted sum: drop rows with missing weight or missing measure,
@@ -678,7 +719,7 @@ def _compute_custom_pct(
                 return data.groupby(groups, dropna=dropna).size().rename(None)
             return pd.Series({"__total__": len(data)})
 
-    def _norm_for_lookup(v):
+    def _norm_for_lookup(v: object) -> object:
         if v is None:
             return "__nan__"
         try:
@@ -690,7 +731,7 @@ def _compute_custom_pct(
             return "__nan__"
         return v
 
-    def _norm_lookup_key(k):
+    def _norm_lookup_key(k: object) -> object:
         if isinstance(k, tuple):
             return tuple(_norm_for_lookup(v) for v in k)
         return _norm_for_lookup(k)

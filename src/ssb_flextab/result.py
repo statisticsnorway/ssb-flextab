@@ -294,71 +294,71 @@ class FlextabResult(pd.DataFrame):
         m.group(0),
     )
 
-                for line in lines:
-                    stripped = line.strip()
-                    if "<thead>" in stripped:
-                        in_thead = True
-                    if "</thead>" in stripped:
-                        in_thead = False
+            for line in lines:
+                stripped = line.strip()
+                if "<thead>" in stripped:
+                    in_thead = True
+                if "</thead>" in stripped:
+                    in_thead = False
 
-                    if in_thead and stripped.startswith("<tr"):
-                        in_thead_row = True
+                if in_thead and stripped.startswith("<tr"):
+                    in_thead_row = True
 
-                    elif in_thead and in_thead_row and stripped.startswith("<th"):
-                        # Is this the row_header cell (holds the row_header=
-                        # text), or a plain column-header cell?
-                        text = _html.unescape(_re.sub(r"<[^>]+>", "", stripped)).strip()
-                        if row_header_names and text in row_header_names:
-                            rh_bg = _resolve(rh_bg_spec, header_row_idx)
-                            rh_fg = _resolve(rh_fg_spec, header_row_idx)
-                            css_str = _css(rh_bg, rh_fg)
-                        else:
-                            hdr_bg = _resolve(header_bg_spec, header_row_idx)
-                            hdr_fg = _resolve(header_fg_spec, header_row_idx)
-                            css_str = _css(hdr_bg, hdr_fg)
-                        if css_str:
-                            line = _re.sub(
-                                r"<th\b[^>]*>.*?</th>",
-                                lambda m, _c=css_str: _style_one_th(m, _c),
-                                line,
-                            )
+                elif in_thead and in_thead_row and stripped.startswith("<th"):
+                    # Is this the row_header cell (holds the row_header=
+                    # text), or a plain column-header cell?
+                    text = _html.unescape(_re.sub(r"<[^>]+>", "", stripped)).strip()
+                    if row_header_names and text in row_header_names:
+                        rh_bg = _resolve(rh_bg_spec, header_row_idx)
+                        rh_fg = _resolve(rh_fg_spec, header_row_idx)
+                        css_str = _css(rh_bg, rh_fg)
+                    else:
+                        hdr_bg = _resolve(header_bg_spec, header_row_idx)
+                        hdr_fg = _resolve(header_fg_spec, header_row_idx)
+                        css_str = _css(hdr_bg, hdr_fg)
+                    if css_str:
+                        line = _re.sub(
+                            r"<th\b[^>]*>.*?</th>",
+                            lambda m, _c=css_str: _style_one_th(m, _c),
+                            line,
+                        )
 
-                    elif not in_thead and stripped.startswith("<tr>"):
-                        pass  # no row-level styling — each cell below styles itself
+                elif not in_thead and stripped.startswith("<tr>"):
+                    pass  # no row-level styling — each cell below styles itself
 
-                    elif not in_thead and stripped.startswith("<th"):
-                        # Row index cell (groupby LABEL or VALUE cell on the left).
-                        rb = _resolve(row_bg_spec, data_row_idx)
-                        rf = _resolve(row_fg_spec, data_row_idx)
-                        row_css = _css(rb, rf)
-                        if row_css:
-                            line = _re.sub(
-                                r"<th\b([^>]*?)>",
-                                lambda m, css=row_css: f'<th{m.group(1)} style="{css}">',
-                                line,
-                            )
+                elif not in_thead and stripped.startswith("<th"):
+                    # Row index cell (groupby LABEL or VALUE cell on the left).
+                    rb = _resolve(row_bg_spec, data_row_idx)
+                    rf = _resolve(row_fg_spec, data_row_idx)
+                    row_css = _css(rb, rf)
+                    if row_css:
+                        line = _re.sub(
+                            r"<th\b([^>]*?)>",
+                            lambda m, css=row_css: f'<th{m.group(1)} style="{css}">',
+                            line,
+                        )
 
-                    elif not in_thead and stripped.startswith("<td"):
-                        # Data cell.
-                        cb = _resolve(cell_bg_spec, data_row_idx)
-                        cf = _resolve(cell_fg_spec, data_row_idx)
-                        cell_css = _css(cb, cf)
-                        if cell_css:
-                            line = _re.sub(
-                                r"<td\b([^>]*?)>",
-                                lambda m, css=cell_css: f'<td{m.group(1)} style="{css}">',
-                                line,
-                            )
+                elif not in_thead and stripped.startswith("<td"):
+                    # Data cell.
+                    cb = _resolve(cell_bg_spec, data_row_idx)
+                    cf = _resolve(cell_fg_spec, data_row_idx)
+                    cell_css = _css(cb, cf)
+                    if cell_css:
+                        line = _re.sub(
+                            r"<td\b([^>]*?)>",
+                            lambda m, css=cell_css: f'<td{m.group(1)} style="{css}">',
+                            line,
+                        )
 
-                    if "</tr>" in stripped:
-                        if in_thead:
-                            header_row_idx += 1
-                            in_thead_row = False
-                        else:
-                            data_row_idx += 1
+                if "</tr>" in stripped:
+                    if in_thead:
+                        header_row_idx += 1
+                        in_thead_row = False
+                    else:
+                        data_row_idx += 1
 
-                    out.append(line)
-                html = "\n".join(out)
+                out.append(line)
+            html = "\n".join(out)
 
             return html
         except Exception:

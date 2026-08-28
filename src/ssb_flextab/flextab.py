@@ -893,7 +893,7 @@ def flextab(
 
 
 def _sort_row_keys(
-    row_keys: list, hdr_path: dict | None = None, value_key_fn: str | None =None
+    row_keys: list, hdr_path: dict | None = None, value_key_fn: str | None = None
 ) -> list:
     """Re-order row/column keys to follow the TABLE expression's written order.
 
@@ -1087,13 +1087,13 @@ def _normalise_idx(idx_tuple: tuple):
 
 
 def _fill_cells(
-        cells: dict[Any, dict[Any, Any]],
-        series: pd.Series,
-        r_hdr: Any,
-        c_hdr: Any,
-        r_groups: list[str],
-        c_groups: list[str],
-    ) -> None:
+    cells: dict[Any, dict[Any, Any]],
+    series: pd.Series,
+    r_hdr: Any,
+    c_hdr: Any,
+    r_groups: list[str],
+    c_groups: list[str],
+) -> None:
     """Distribute a grouped Series into the cells dict."""
     n_r = len(r_groups)
     n_c = len(c_groups)

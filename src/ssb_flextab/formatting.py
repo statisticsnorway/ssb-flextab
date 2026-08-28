@@ -87,9 +87,8 @@ def _parse_fmt_spec(spec: str):
 
 
 def _format_dataframe(
-    result: pd.DataFrame,
-    fmt: str ="{:.3f}",
-    na_rep: str =".") -> pd.DataFrame:
+    result: pd.DataFrame, fmt: str = "{:.3f}", na_rep: str = "."
+) -> pd.DataFrame:
     """Build a string-valued copy of result with per-column AND per-row formats applied.
 
     A format= spec can appear on either the row or the column dimension of
@@ -124,9 +123,8 @@ def _format_dataframe(
 
 
 def flextab_to_string(
-    result: "FlextabResult",
-    fmt: str ="{:.3f}",
-    na_rep: str =".") -> str:
+    result: "FlextabResult", fmt: str = "{:.3f}", na_rep: str = "."
+) -> str:
     """Render a flextab() result as a formatted string.
 
     Parameters
@@ -164,10 +162,8 @@ def flextab_to_string(
 
 
 def flextab_to_markdown(
-    result: "FlextabResult",
-    fmt: str="{:.3f}",
-    na_rep: str=".",
-    sep: str=" / ") -> str:
+    result: "FlextabResult", fmt: str = "{:.3f}", na_rep: str = ".", sep: str = " / "
+) -> str:
     """Render a flextab() result as a plain Markdown table.
 
     The table contains flattened, human-readable column headers instead of

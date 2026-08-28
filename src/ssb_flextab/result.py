@@ -127,7 +127,9 @@ class FlextabResult(pd.DataFrame):
         return spec
 
     @staticmethod
-    def _fmt_to_excel_numfmt(formatter: Callable[..., Any],) -> str:
+    def _fmt_to_excel_numfmt(
+        formatter: Callable[..., Any],
+    ) -> str:
         """Convert a _parse_fmt_spec formatter to an Excel number format string.
 
         Inspects the closure variables of the formatter to reliably determine
@@ -225,7 +227,7 @@ class FlextabResult(pd.DataFrame):
             def _css(
                 bg: Any = None,
                 fg: Any = None,
-                ) -> str:
+            ) -> str:
                 parts = []
                 if bg:
                     hex_bg = FlextabResult._to_hex(bg)
@@ -286,10 +288,10 @@ class FlextabResult(pd.DataFrame):
                     return m.group(0)
 
                 return _re.sub(
-        r"<th\b([^>]*)>",
-        lambda mm: f'<th{mm.group(1)} style="{css_str}">',
-        m.group(0),
-    )
+                    r"<th\b([^>]*)>",
+                    lambda mm: f'<th{mm.group(1)} style="{css_str}">',
+                    m.group(0),
+                )
 
             for line in lines:
                 stripped = line.strip()
@@ -469,7 +471,9 @@ class FlextabResult(pd.DataFrame):
         def _font(hex_color: str) -> Font:
             return Font(color=hex_color)
 
-        def _apply(cell: Cell, bg_hex: str | None = None, fg_hex: str | None = None) -> None:
+        def _apply(
+            cell: Cell, bg_hex: str | None = None, fg_hex: str | None = None
+        ) -> None:
             if bg_hex:
                 cell.fill = _fill(bg_hex)
             if fg_hex:

@@ -165,7 +165,7 @@ def _wpercentile(
     x: pd.Series,
     w: pd.Series,
     q: float,
-    ):
+):
     """Weighted percentile via linear interpolation on the weighted ECDF."""
     x, w = _drop_nan_x(x, w)
     if len(x) == 0 or w.sum() == 0:
@@ -183,7 +183,7 @@ def _wpercentile(
 def _wgmean(
     x: pd.Series,
     w: pd.Series,
-    ):
+):
     # Weighted geometric mean: exp( (sum w*ln x) / (sum w) )
     x, w = _drop_nan_x(x, w)
     mask = x > 0
@@ -199,7 +199,7 @@ def _wgmean(
 def _whmean(
     x: pd.Series,
     w: pd.Series,
-    ):
+):
     # Weighted harmonic mean: (sum w) / (sum w/x)
     x, w = _drop_nan_x(x, w)
     mask = x != 0
@@ -324,7 +324,7 @@ def _compute_series(
             if weight is not None and wfunc is not None:
                 cols = [var, weight]
 
-                def _apply(g: pd.DataFrame)-> float:
+                def _apply(g: pd.DataFrame) -> float:
                     return wfunc(g[var], g[weight])
 
                 if groups:

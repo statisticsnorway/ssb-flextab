@@ -6,44 +6,32 @@ from .statistics import ALL_STATS
 
 
 def _tokenize(expr: str) -> list[tuple]:
-    """Tokenize a single TABLE dimension expression into a flat list of tokens.
-
-    Token types emitted:
-      ('NAME', name, label)     a variable or keyword name; label is the
-                                 string from name='...' or None if absent
-      ('FMT',  fmt_spec)        a format specification from format=W.D[_s]
-      ('DENOM', inner)          denominator definition from <tok1 tok2 ...>
-      ('OP',   char)            operator character: '*' or '(' or ')'
-      ('SP',   ' ')             whitespace (used as a concatenation signal)
-
-    The pattern tries alternatives left-to-right so that format=7,2 is
-    captured as FMT before the comma could be misread as a dimension
-    separator, and <...> is captured as DENOM before its content could
-    be misread as NAME tokens.
-
-    Label quoting:
-      name="Label"  or  name='Label'   (either quote style accepted)
-      name=""        or  name=''        suppresses the label (empty string)
-    """
+    """Tokenize a single TABLE dimension expression into a flat list of tokens."""
     pattern = re.compile(
-        # format=7.2[_|s]  -> decimal point, 2 decimals
-        # format=7,2[_|s]  -> decimal comma,  2 decimals
-        # trailing _ or s  -> thousands separator (comma/dot or space)
         r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)"
-        # denominator definition: <token1 token2 ...>
         r"|(?P<denom><[^>]*>)"
         r"|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*"
         r'(?:"(?P<dq_label>[^"]*)"|\'(?P<sq_label>[^\']*)\')'
         r"|(?P<name>[A-Za-z_][A-Za-z0-9_%]*)"
         r"|(?P<op>[*()])"
-        r"|(?P<space>\s+)",
+        r"|(?P<space>\s+)"
     )
+
     tokens = []
+    pos = 0
+
     for m in pattern.finditer(expr):
+        if m.start() != pos:
+            invalid = expr[pos : m.start()]
+            raise SyntaxError(
+                f"Unexpected character(s) {invalid!r} at position {pos}"
+            )
+
+        pos = m.end()
+
         if m.group("fmt"):
             tokens.append(("FMT", m.group("fmt_spec")))
         elif m.group("denom"):
-            # Strip the angle brackets and whitespace, split into tokens
             inner = m.group("denom")[1:-1].strip()
             tokens.append(("DENOM", inner))
         elif m.group("labeled"):
@@ -59,15 +47,25 @@ def _tokenize(expr: str) -> list[tuple]:
             tokens.append(("OP", m.group("op")))
         elif m.group("space"):
             tokens.append(("SP", " "))
+
+    if pos != len(expr):
+        invalid = expr[pos:]
+        raise SyntaxError(
+            f"Unexpected character(s) {invalid!r} at position {pos}"
+        )
+
     cleaned = []
-    for t in tokens:
-        if t[0] == "SP" and cleaned and cleaned[-1][0] == "SP":
+    for token in tokens:
+        if token[0] == "SP" and cleaned and cleaned[-1][0] == "SP":
             continue
-        cleaned.append(t)
+        cleaned.append(token)
+
     while cleaned and cleaned[0][0] == "SP":
         cleaned.pop(0)
+
     while cleaned and cleaned[-1][0] == "SP":
         cleaned.pop()
+
     return cleaned
 
 
@@ -158,7 +156,15 @@ class _Parser:
         self.pos += 1
 
     def parse(self) -> DimNode:
-        return self._parse_concat()
+        node = self._parse_concat()
+        self._skip_sp()
+
+        if self.pos != len(self.tokens):
+            raise SyntaxError(
+                f"Unexpected token: {self.tokens[self.pos]}"
+            )
+
+        return node
 
     def _parse_concat(self) -> DimNode:
         nodes = [self._parse_cross()]

@@ -10,7 +10,7 @@ from ssb_flextab.parser import (
 )
 
 def test_tokenize_simple_expression():
-    tokens = _tokenize("sex, income*MEAN")
+    tokens = _tokenize("income*MEAN")
 
     assert tokens
 
@@ -25,81 +25,83 @@ def test_split_dimensions_single_dimension():
     assert len(dims) == 1
 
 def test_parse_single_variable():
-    row, col = parse_table("sex")
+    row = parse_table("sex")[0]
 
     assert row is not None
-    assert col is None
     assert row.kind == "var"
     assert row.name == "sex"
 
 def test_parse_cross_expression():
-    row, col = parse_table("sex*region")
+    node = parse_table("sex*region")[0]
 
-    assert row.kind == "cross"
-    assert len(row.children) == 2
-    assert row.children[0].name == "sex"
-    assert row.children[1].name == "region"
+    assert node.kind == "cross"
+    assert len(node.children) == 2
+    assert node.children[0].name == "sex"
+    assert node.children[1].name == "region"
 
 def test_parse_concat_expression():
-    row, col = parse_table("sex region")
+    node = parse_table("sex region")[0]
 
-    assert row.kind == "concat"
-    assert [child.name for child in row.children] == ["sex", "region"]
+    assert node.kind == "concat"
+    assert [child.name for child in node.children] == ["sex", "region"]
 
 def test_parse_group_expression():
-    row, col = parse_table("(sex region)*income")
+    node = parse_table("(sex region)*income")[0]
 
-    assert row.kind == "cross"
-    assert row.children[0].kind == "group"
+    assert node.kind == "cross"
+    assert node.children[0].kind == "group"
+    assert node.children[1].name == "income"
 
 @pytest.mark.parametrize("keyword", ["ALL", "TOTAL"])
 def test_parse_total_keyword(keyword):
-    row, col = parse_table(keyword)
+    node = parse_table(keyword)[0]
 
-    assert row.kind == "all"
+    assert node.kind == "all"
+    assert node.name == "ALL"
 
 def test_parse_label():
-    row, col = parse_table("sex='Gender'")
+    node = parse_table("sex='Gender'")[0]
 
-    assert row.kind == "var"
-    assert row.label == "Gender"
+    assert node.kind == "var"
+    assert node.name == "sex"
+    assert node.label == "Gender"
 
 def test_parse_format_spec():
-    row, col = parse_table("MEAN*format=7,1")
+    node = parse_table("MEAN*format=7,1")[0]
 
-    assert row.fmt == "7,1"
+    assert node.fmt == "7,1"
 
 def test_parse_custom_denominator():
-    row, col = parse_table("PCTN<gender all>")
+    node = parse_table("PCTN<gender all>")[0]
 
-    assert row.denom == "gender all"
+    assert node.denom == "gender all"
 
 def test_expand_concat_produces_separate_paths():
-    row, _ = parse_table("sex region")
+    node = parse_table("sex region")[0]
 
-    paths = _expand_node(row)
+    paths = _expand_node(node)
 
     assert len(paths) == 2
 
 def test_expand_cross_combines_paths():
-    row, _ = parse_table("sex*region")
+    node = parse_table("sex*region")[0]
 
-    paths = _expand_node(row)
+    paths = _expand_node(node)
 
     assert len(paths) == 1
-    assert [node.name for node in paths[0]] == ["sex", "region"]
+    assert [n.name for n in paths[0]] == ["sex", "region"]
 
 def test_expand_with_branch_numbers_top_level_concat():
-    row, _ = parse_table("sex region")
+    node = parse_table("sex region")[0]
 
-    expanded = _expand_node_with_branch(row)
+    expanded = _expand_node_with_branch(node)
 
     assert [branch for branch, _ in expanded] == [0, 1]
 
 def test_expand_with_branch_cross_uses_single_branch():
-    row, _ = parse_table("sex*region")
+    node = parse_table("sex*region")[0]
 
-    expanded = _expand_node_with_branch(row)
+    expanded = _expand_node_with_branch(node)
 
     assert all(branch == 0 for branch, _ in expanded)
 
@@ -109,14 +111,17 @@ def test_expand_with_branch_cross_uses_single_branch():
         "(",
         "sex*",
         "*sex",
-        "sex,,region",
         "sex)",
     ],
 )
 def test_invalid_syntax_raises(expr):
-    with pytest.raises(ValueError):
+    with pytest.raises(SyntaxError):
         parse_table(expr)
 
 def test_invalid_character_is_rejected():
-    with pytest.raises(ValueError):
+    with pytest.raises(SyntaxError):
         parse_table("sex @ region")
+
+def test_too_many_dimensions_raises():
+    with pytest.raises(ValueError, match="at most 2 dimensions"):
+        parse_table("sex,,region")

@@ -206,7 +206,7 @@ def flextab(
     fmt: str = "{:.1f}",
     na_rep: str | None = None,
     labels: dict | None = None,
-    sort_by: str = 'code',
+    sort_by: str = "code",
     weight: str | None = None,
     row_header: str | None = None,
     style: dict | None = None,
@@ -385,7 +385,7 @@ def flextab(
     measure = measure or []
     groupby = groupby or []
     missing = include_missing_in_groupby
-    labels  = labels  or {}
+    labels = labels or {}
     # Flat lookup: original_value -> display_label for any groupby column.
     # Used by _fmt_val inside _key_to_label to remap codes to labels.
     _label_map = labels  # kept separate so groupby always uses original codes
@@ -413,10 +413,19 @@ def flextab(
 
     def expand_dim(dim_node):
         if dim_node is None:
-            return [{"group_keys": [], "var": None, "var_label": None,
-                     "stat": None, "stat_label": None,
-                     "has_all": False, "all_label": None,
-                     "path_order": [], "branch": 0}]
+            return [
+                {
+                    "group_keys": [],
+                    "var": None,
+                    "var_label": None,
+                    "stat": None,
+                    "stat_label": None,
+                    "has_all": False,
+                    "all_label": None,
+                    "path_order": [],
+                    "branch": 0,
+                }
+            ]
         specs = []
         for branch_idx, path in _expand_node_with_branch(dim_node):
             spec = _classify_path(path, measure, groupby)
@@ -439,12 +448,14 @@ def flextab(
         # it does not affect what gets displayed in the table header.
         parts = []
         for entry in spec["path_order"]:
-            label    = entry[1]
-            orig     = entry[2] if len(entry) > 2 else None
+            label = entry[1]
+            orig = entry[2] if len(entry) > 2 else None
             is_group = entry[0] == "group"
             if is_group and not label and orig:
                 # Blank label on a group token → use orig_name internally
-                parts.append(f"\x00{orig}")  # prefix ensures no collision with real labels
+                parts.append(
+                    f"\x00{orig}"
+                )  # prefix ensures no collision with real labels
             else:
                 parts.append(label)
         return tuple(parts) if parts else ("",)
@@ -457,16 +468,16 @@ def flextab(
     col_hdr_path: dict = {}
 
     for r_spec in row_specs:
-        r_hdr    = spec_header(r_spec)
+        r_hdr = spec_header(r_spec)
         r_groups = orig_groups(r_spec)
         row_hdr_path.setdefault(r_hdr, (r_spec["path_order"], r_spec["branch"]))
 
         for c_spec in col_specs:
-            c_hdr    = spec_header(c_spec)
+            c_hdr = spec_header(c_spec)
             c_groups = orig_groups(c_spec)
             col_hdr_path.setdefault(c_hdr, (c_spec["path_order"], c_spec["branch"]))
 
-            var  = r_spec["var"]  or c_spec["var"]
+            var = r_spec["var"] or c_spec["var"]
             stat = r_spec["stat"] or c_spec["stat"]
 
             if stat is None:
@@ -500,33 +511,60 @@ def flextab(
 
             elif not has_all_r and not has_all_c:
                 series = _compute_series(
-                    data, all_groups, var, stat, r_groups, c_groups, missing,
-                    weight=weight
+                    data,
+                    all_groups,
+                    var,
+                    stat,
+                    r_groups,
+                    c_groups,
+                    missing,
+                    weight=weight,
                 )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
             elif has_all_r and not has_all_c:
                 # ALL on rows: c_groups drive the column denominator for COLPCTN
                 keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(data, keep, var, stat, missing,
-                                             r_groups=r_groups, c_groups=c_groups,
-                                             weight=weight)
+                series = _compute_all_series(
+                    data,
+                    keep,
+                    var,
+                    stat,
+                    missing,
+                    r_groups=r_groups,
+                    c_groups=c_groups,
+                    weight=weight,
+                )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
             elif not has_all_r and has_all_c:
                 # ALL on cols: r_groups drive the row denominator for ROWPCTN
                 keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(data, keep, var, stat, missing,
-                                             r_groups=r_groups, c_groups=c_groups,
-                                             weight=weight)
+                series = _compute_all_series(
+                    data,
+                    keep,
+                    var,
+                    stat,
+                    missing,
+                    r_groups=r_groups,
+                    c_groups=c_groups,
+                    weight=weight,
+                )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
             else:
                 # ALL on both: pass both for correct denominator selection
                 keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(data, keep, var, stat, missing,
-                                             r_groups=r_groups, c_groups=c_groups,
-                                             weight=weight)
+                series = _compute_all_series(
+                    data,
+                    keep,
+                    var,
+                    stat,
+                    missing,
+                    r_groups=r_groups,
+                    c_groups=c_groups,
+                    weight=weight,
+                )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
     def _index_value_key(orig_col, v):
@@ -544,7 +582,6 @@ def flextab(
         label dictionary at all, fall back to their normalised string form and
         are sorted after all explicitly labelled values.
         """
-
         col_labels = _label_map.get(orig_col) if orig_col else None
         if col_labels and v in col_labels:
             keys_in_order = list(col_labels.keys())
@@ -562,7 +599,6 @@ def flextab(
         to their normalised string form, sorted after all explicitly
         labelled values.
         """
-
         col_labels = _label_map.get(orig_col) if orig_col else None
         if col_labels and v in col_labels:
             return (0, str(col_labels[v]))
@@ -580,16 +616,18 @@ def flextab(
 
     def _sort_keys(keys, hdr_path):
         """Sort row/col keys, respecting sort_by='code', 'index', or 'label'."""
-        if sort_by == 'index' and _label_map:
+        if sort_by == "index" and _label_map:
             value_key_fn = _index_value_key
-        elif sort_by == 'label' and _label_map:
+        elif sort_by == "label" and _label_map:
             value_key_fn = _label_text_value_key
         else:
             value_key_fn = None
         return _sort_row_keys(keys, hdr_path, value_key_fn=value_key_fn)
 
     all_row_keys = _sort_keys(list(dict.fromkeys(rk for rk in cells)), row_hdr_path)
-    all_col_keys = _sort_keys(list(dict.fromkeys(ck for rk in cells for ck in cells[rk])), col_hdr_path)
+    all_col_keys = _sort_keys(
+        list(dict.fromkeys(ck for rk in cells for ck in cells[rk])), col_hdr_path
+    )
 
     matrix = np.full((len(all_row_keys), len(all_col_keys)), np.nan)
     rk_pos = {rk: i for i, rk in enumerate(all_row_keys)}
@@ -609,7 +647,6 @@ def flextab(
                    If col_name is None or not in _label_map, no remapping
                    is applied beyond the nan/sentinel handling.
         """
-
         if v is None or v == _NAN_SENTINEL:
             return "nan"
         if isinstance(v, float):
@@ -634,16 +671,13 @@ def flextab(
 
         Returns a list of ints, outermost first.
         """
-
         if not all_path_orders:
             return []
         max_len = max((len(po) for po in all_path_orders), default=0)
         slots = []
         for i in range(max_len):
             has_labeled_group = any(
-                i < len(po)
-                and po[i][0] == "group"
-                and po[i][1]          # label is non-blank
+                i < len(po) and po[i][0] == "group" and po[i][1]  # label is non-blank
                 for po in all_path_orders
             )
             slots.append(2 if has_labeled_group else 1)
@@ -666,14 +700,15 @@ def flextab(
           - group with non-blank label (2 slots): label -> high slot, value -> low slot
           - group with blank label (1 slot): value -> low slot only (label suppressed)
         """
-
         if not path_order:
             return hdr
 
         D = sum(slots)
         is_total = (not data_key) or data_key == (_SENTINEL,)
-        dvals = [] if is_total else list(
-            data_key if isinstance(data_key, tuple) else (data_key,)
+        dvals = (
+            []
+            if is_total
+            else list(data_key if isinstance(data_key, tuple) else (data_key,))
         )
         data_iter = iter(dvals)
 
@@ -683,13 +718,13 @@ def flextab(
             # local_pos is the index within path_order (0 = outermost of THIS spec)
             # map to the global slots list (bottom-aligned)
             global_pos = len(slots) - len(path_order) + local_pos
-            low  = sum(slots[global_pos + 1:])
+            low = sum(slots[global_pos + 1 :])
             high = low + slots[global_pos] - 1
             return D - 1 - high, D - 1 - low  # (hi_idx, lo_idx)
 
         for pos, entry in enumerate(path_order):
-            kind      = entry[0]
-            label     = entry[1]
+            kind = entry[0]
+            label = entry[1]
             orig_name = entry[2] if len(entry) > 2 else None
             hi_idx, lo_idx = slot_range(pos)
 
@@ -699,10 +734,10 @@ def flextab(
                 if is_total:
                     pass
                 else:
-                    val     = next(data_iter, None)
+                    val = next(data_iter, None)
                     val_str = _fmt_val(val, col_name=orig_name)
                     global_pos = len(slots) - len(path_order) + pos
-                    has_label_slot = (slots[global_pos] == 2)
+                    has_label_slot = slots[global_pos] == 2
                     # In the 2-slot system, every group position has a dedicated
                     # label slot (hi_idx) and value slot (lo_idx). Whether a
                     # group is "preceding" or "last" no longer matters for slot
@@ -751,17 +786,17 @@ def flextab(
         Both have D=4; the Subtotal row's trailing '' is kept so 'Asia' aligns
         vertically with 'Asia' in the detail rows (2-slot group positions).
         """
-
         all_po = [hdr_path.get(hdr, ([], 0))[0] for hdr, _ in keys]
-        slots  = _compute_slot_layout(all_po)
-        D      = sum(slots)
+        slots = _compute_slot_layout(all_po)
+        D = sum(slots)
 
         if D == 0:
             return pd.Index([""] * len(keys))
 
         labels = [
             _key_to_label_slotted(
-                hdr, dk,
+                hdr,
+                dk,
                 hdr_path.get(hdr, ([], 0))[0],
                 slots,
             )
@@ -770,10 +805,7 @@ def flextab(
 
         # Drop levels that are blank in every column
         if labels and len(labels[0]) > 1:
-            keep = [
-                i for i in range(len(labels[0]))
-                if any(t[i] for t in labels)
-            ]
+            keep = [i for i in range(len(labels[0])) if any(t[i] for t in labels)]
             if len(keep) < len(labels[0]):
                 labels = [tuple(t[i] for i in keep) for t in labels]
 
@@ -823,7 +855,7 @@ def flextab(
     result.attrs["col_fmt_map"] = col_fmt_map
     result.attrs["row_fmt_map"] = row_fmt_map
     result.attrs["default_fmt"] = fmt
-    result.attrs["style"]       = style or {}
+    result.attrs["style"] = style or {}
 
     # Apply row_header: name the row index so it prints as a column label
     if row_header is not None:
@@ -834,7 +866,10 @@ def flextab(
 
     return result
 
-def _sort_row_keys(row_keys: list, hdr_path: dict | None = None, value_key_fn=None) -> list:
+
+def _sort_row_keys(
+    row_keys: list, hdr_path: dict | None = None, value_key_fn=None
+) -> list:
     """Re-order row/column keys to follow the TABLE expression's written order.
 
     Two ordering rules combine, applied in this priority:
@@ -882,7 +917,6 @@ def _sort_row_keys(row_keys: list, hdr_path: dict | None = None, value_key_fn=No
                    (sort_by='index'), or by the label text itself
                    (sort_by='label').
     """
-    
     hdr_path = hdr_path or {}
 
     def _normalise(v):
@@ -1005,12 +1039,11 @@ _NAN_SENTINEL = "__nan__"
 
 def _normalise_key(val):
     """Normalise a group key value so that all missing-value representations.
-    
+
     (float nan, pd.NA, pd.NaT, None) map to a single canonical object.
     This prevents duplicate row/column keys when different aggregation calls
     (e.g. groupby on a column vs .size()) return different NA types.
     """
-
     if val is None:
         return _NAN_SENTINEL
     if val is pd.NA or val is pd.NaT:
@@ -1046,7 +1079,7 @@ def _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups):
             # Normalise before slicing so all NA types hash consistently
             idx_tuple = _normalise_idx(idx_tuple)
             r_data = idx_tuple[:n_r] if n_r else (_SENTINEL,)
-            c_data = idx_tuple[n_r:n_r + n_c] if n_c else (_SENTINEL,)
+            c_data = idx_tuple[n_r : n_r + n_c] if n_c else (_SENTINEL,)
 
         rk = (r_hdr, r_data)
         ck = (c_hdr, c_data)
@@ -1058,12 +1091,14 @@ def _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups):
 if __name__ == "__main__":
     np.random.seed(42)
     n = 200
-    demo = pd.DataFrame({
-        "origin":     np.random.choice(["Asia", "Europe", "USA"], n),
-        "type":       np.random.choice(["Sedan", "SUV", "Truck"], n),
-        "msrp":       np.random.normal(35000, 12000, n).clip(10000),
-        "horsepower": np.random.normal(220, 60, n).clip(80),
-    })
+    demo = pd.DataFrame(
+        {
+            "origin": np.random.choice(["Asia", "Europe", "USA"], n),
+            "type": np.random.choice(["Sedan", "SUV", "Truck"], n),
+            "msrp": np.random.normal(35000, 12000, n).clip(10000),
+            "horsepower": np.random.normal(220, 60, n).clip(80),
+        }
+    )
 
     sep = "=" * 70
 
@@ -1071,7 +1106,8 @@ if __name__ == "__main__":
     print("Example 1 — 1D, no groupby, stat labels")
     print(sep)
     r1 = flextab(
-        data=demo, measure=["msrp", "horsepower"],
+        data=demo,
+        measure=["msrp", "horsepower"],
         table="msrp='' * (N MEAN='Average' STD='Std Dev') horsepower='' * (N MEAN='Average')",
     )
     print(flextab_to_string(r1))
@@ -1080,7 +1116,9 @@ if __name__ == "__main__":
     print("Example 2 — 2D: origin renamed, msrp suppressed")
     print(sep)
     r2 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin"],
         table="origin='Region', msrp='' * (N MEAN='Mean' ROWPCTN='Row %')",
     )
     print(flextab_to_string(r2))
@@ -1089,7 +1127,9 @@ if __name__ == "__main__":
     print("Example 3 — ALL='Total' in row dimension")
     print(sep)
     r3 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin"],
         table="origin ALL='Total', msrp='' * (N MEAN='Mean' MIN MAX)",
     )
     print(flextab_to_string(r3))
@@ -1098,7 +1138,9 @@ if __name__ == "__main__":
     print("Example 4 — ALL in both dimensions (grand-total row + col)")
     print(sep)
     r4 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin", "type"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin", "type"],
         table="origin * type ALL='Subtotal', msrp='' * (N MEAN='Mean') ALL='Grand Total'",
     )
     print(flextab_to_string(r4))
@@ -1107,7 +1149,9 @@ if __name__ == "__main__":
     print("Example 5 — Percent stats with labels")
     print(sep)
     r5 = flextab(
-        data=demo, measure=["msrp"], groupby=["origin"],
+        data=demo,
+        measure=["msrp"],
+        groupby=["origin"],
         table="origin='Region' ALL='Total', msrp='' * (PCTN='% of Total' COLPCTN='Col %')",
     )
     print(flextab_to_string(r5))
@@ -1116,7 +1160,8 @@ if __name__ == "__main__":
     print("Example 6 — Nested groupby + ALL subtotal")
     print(sep)
     r6 = flextab(
-        data=demo, measure=["msrp", "horsepower"],
+        data=demo,
+        measure=["msrp", "horsepower"],
         groupby=["origin", "type"],
         table="origin * (type ALL='Subtotal'), msrp='' * (N MEAN='Mean') horsepower='' * MEAN='Mean'",
     )
@@ -1125,14 +1170,21 @@ if __name__ == "__main__":
     print(f"\n{sep}")
     print("Example 7 — nan rows: single nan per groupby value")
     print(sep)
-    demo2 = pd.DataFrame({"origin": ["Asia", None, "USA"], "msrp": [30000, 40000, None]})
+    demo2 = pd.DataFrame(
+        {"origin": ["Asia", None, "USA"], "msrp": [30000, 40000, None]}
+    )
     r7 = flextab(
-        data=demo2, groupby=["origin"], measure=["msrp"],
+        data=demo2,
+        groupby=["origin"],
+        measure=["msrp"],
         table="origin, msrp*(sum n) n",
-        include_missing_in_groupby=True)
+        include_missing_in_groupby=True,
+    )
     print(flextab_to_string(r7))
     assert len(r7) == 3, f"Expected 3 rows, got {len(r7)}"
     # Index is now (label, value) tuples e.g. ('origin','nan') — check value level
     idx_values = [t[-1] if isinstance(t, tuple) else t for t in r7.index]
-    assert idx_values.count("nan") == 1, f"nan should appear exactly once, got: {idx_values}"
+    assert (
+        idx_values.count("nan") == 1
+    ), f"nan should appear exactly once, got: {idx_values}"
     print("OK: 3 rows, nan appears once")

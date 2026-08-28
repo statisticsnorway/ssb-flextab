@@ -48,7 +48,7 @@ pip install ssb-flextab
 
 ## Usage
 
-A [tutorial](docs/flextab_tutorial.md) is found in the in the `docs` folder. 
+A [tutorial](docs/flextab_tutorial.md) is found in the in the `docs` folder.
 
 ## Contributing
 

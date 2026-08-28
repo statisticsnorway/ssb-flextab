@@ -29,14 +29,14 @@ def _tokenize(expr: str) -> list[tuple]:
         # format=7.2[_|s]  -> decimal point, 2 decimals
         # format=7,2[_|s]  -> decimal comma,  2 decimals
         # trailing _ or s  -> thousands separator (comma/dot or space)
-        r'(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)'
+        r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)"
         # denominator definition: <token1 token2 ...>
-        r'|(?P<denom><[^>]*>)'
-        r'|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*'
+        r"|(?P<denom><[^>]*>)"
+        r"|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*"
         r'(?:"(?P<dq_label>[^"]*)"|\'(?P<sq_label>[^\']*)\')'
-        r'|(?P<name>[A-Za-z_][A-Za-z0-9_%]*)'
-        r'|(?P<op>[*()])'
-        r'|(?P<space>\s+)',
+        r"|(?P<name>[A-Za-z_][A-Za-z0-9_%]*)"
+        r"|(?P<op>[*()])"
+        r"|(?P<space>\s+)",
     )
     tokens = []
     for m in pattern.finditer(expr):
@@ -47,7 +47,11 @@ def _tokenize(expr: str) -> list[tuple]:
             inner = m.group("denom")[1:-1].strip()
             tokens.append(("DENOM", inner))
         elif m.group("labeled"):
-            label = m.group("dq_label") if m.group("dq_label") is not None else m.group("sq_label")
+            label = (
+                m.group("dq_label")
+                if m.group("dq_label") is not None
+                else m.group("sq_label")
+            )
             tokens.append(("NAME", m.group("labeled"), label))
         elif m.group("name"):
             tokens.append(("NAME", m.group("name"), None))
@@ -103,10 +107,11 @@ class DimNode:
     children : list of DimNode
         Sub-nodes for cross/concat/group kinds.
     """
+
     kind: str
     name: str | None = None
     label: str | None = None
-    fmt:   str | None = None
+    fmt: str | None = None
     denom: str | None = None
     children: list["DimNode"] = field(default_factory=list)
 
@@ -238,10 +243,12 @@ class _Parser:
             name_upper = t[1].upper()
             label = t[2]
             # Consume an immediately following FMT token if present
-            fmt   = self._consume_fmt()
+            fmt = self._consume_fmt()
             denom = self._consume_denom()
             if name_upper in ("ALL", "TOTAL"):
-                return DimNode(kind="all", name="ALL", label=label, fmt=fmt, denom=denom)
+                return DimNode(
+                    kind="all", name="ALL", label=label, fmt=fmt, denom=denom
+                )
             return DimNode(kind="var", name=t[1], label=label, fmt=fmt, denom=denom)
         raise SyntaxError(f"Unexpected token: {t}")
 
@@ -258,7 +265,7 @@ class _Parser:
 
     def _consume_denom(self) -> str | None:
         """Consume and return a DENOM token.
-        
+
         (e.g. the 'income' from
         pctsum<income>) immediately after the current position, or None.
         """
@@ -303,7 +310,7 @@ def _split_dimensions(expr: str) -> list[str]:
         elif ch == "," and depth == 0:
             # Check if this comma is the decimal separator in "format=<digits>,"
             so_far = "".join(current)
-            if re.search(r'format\s*=\s*[0-9]+$', so_far):
+            if re.search(r"format\s*=\s*[0-9]+$", so_far):
                 current.append(ch)  # decimal comma in format=W,D — not a separator
             else:
                 parts.append("".join(current))
@@ -320,15 +327,19 @@ def parse_table(table_str: str) -> tuple:
     """Parse table."""
     dims = _split_dimensions(table_str)
     if len(dims) > 2:
-        raise ValueError("TABLE supports at most 2 dimensions (row, col). The page dimension is not supported.")
+        raise ValueError(
+            "TABLE supports at most 2 dimensions (row, col). The page dimension is not supported."
+        )
     result = []
     for dim in dims:
         tokens = _tokenize(dim.strip())
         result.append(_Parser(tokens).parse())
     return tuple(result)
 
+
 def _expand_node(node: DimNode) -> list[list[DimNode]]:
     from itertools import product as iproduct
+
     if node.kind in ("var", "all"):
         return [[node]]
     if node.kind == "group":
@@ -349,7 +360,7 @@ def _expand_node(node: DimNode) -> list[list[DimNode]]:
 
 def _expand_node_with_branch(node: DimNode):
     """Like _expand_node.
-    
+
     But additionally returns a top-level branch index for
     each path, used to order specs that come from a TOP-LEVEL concatenation
     (space-separated dimension root) in written left-to-right order.
@@ -375,6 +386,7 @@ def _expand_node_with_branch(node: DimNode):
         return result
     return [(0, path) for path in _expand_node(node)]
 
+
 def _classify_path(
     path: list[DimNode], measure_list: list[str], groupby_list: list[str]
 ):
@@ -382,28 +394,28 @@ def _classify_path(
     groupby_map = {g.upper(): g for g in groupby_list}
 
     group_keys = []
-    var        = None
-    var_label  = None
-    stat       = None
+    var = None
+    var_label = None
+    stat = None
     stat_label = None
-    has_all    = False
-    all_label  = None
+    has_all = False
+    all_label = None
 
     for node in path:
         upper = node.name.upper() if node.name else ""
         if node.kind == "all":
-            has_all   = True
+            has_all = True
             all_label = node.label
         elif upper in groupby_map:
             orig = groupby_map[upper]
-            lbl  = node.label if node.label is not None else orig
+            lbl = node.label if node.label is not None else orig
             group_keys.append((orig, lbl))
         elif upper in measure_map:
-            orig      = measure_map[upper]
-            var       = orig
+            orig = measure_map[upper]
+            var = orig
             var_label = node.label if node.label is not None else orig
         elif upper in ALL_STATS:
-            stat       = upper
+            stat = upper
             stat_label = node.label if node.label is not None else upper
         else:
             raise ValueError(
@@ -417,7 +429,9 @@ def _classify_path(
     for node in path:
         upper = node.name.upper() if node.name else ""
         if node.kind == "all":
-            path_order.append(("all", node.label if node.label is not None else "TOTAL", None))
+            path_order.append(
+                ("all", node.label if node.label is not None else "TOTAL", None)
+            )
         elif upper in groupby_map:
             orig_name = groupby_map[upper]
             lbl = node.label if node.label is not None else orig_name
@@ -447,13 +461,13 @@ def _classify_path(
 
     return {
         "group_keys": group_keys,
-        "var":        var,
-        "var_label":  var_label,
-        "stat":       stat,
+        "var": var,
+        "var_label": var_label,
+        "stat": stat,
         "stat_label": stat_label,
-        "has_all":    has_all,
-        "all_label":  all_label,
+        "has_all": has_all,
+        "all_label": all_label,
         "path_order": path_order,
-        "fmt":        fmt,
-        "denom_def":  denom_def,
+        "fmt": fmt,
+        "denom_def": denom_def,
     }

@@ -21,37 +21,38 @@ def _hmean(x: pd.Series) -> float:
         return np.nan
     return len(x) / (1.0 / x).sum()
 
+
 _BASE_STATS: dict[str, Callable] = {
     # ── Count statistics ────────────────────────────────────────────────────
     # N, COUNT and SIZE may all be used WITHOUT a measure column (bare count).
-    "N":      lambda x: x.count(),   # backward-compatible alias for COUNT
-    "COUNT":  lambda x: x.count(),   # like pandas Series.count(): counts
-                                      # only NON-MISSING values of the measure
-    "SIZE":   lambda x: x.size,      # like Python len() / numpy .size:
-                                      # counts ALL rows, including those where
-                                      # the measure is missing/NaN
+    "N": lambda x: x.count(),  # backward-compatible alias for COUNT
+    "COUNT": lambda x: x.count(),  # like pandas Series.count(): counts
+    # only NON-MISSING values of the measure
+    "SIZE": lambda x: x.size,  # like Python len() / numpy .size:
+    # counts ALL rows, including those where
+    # the measure is missing/NaN
     # NMISS requires a measure column (there must be something to be missing)
-    "NMISS":  lambda x: x.isna().sum(),
+    "NMISS": lambda x: x.isna().sum(),
     # ── Descriptive statistics (all require a measure column) ────────────────
-    "SUM":    lambda x: x.sum(),
-    "MEAN":   lambda x: x.mean(),
-    "MIN":    lambda x: x.min(),
-    "MAX":    lambda x: x.max(),
-    "STD":    lambda x: x.std(),      # sample std dev (VARDEF=DF, n-1)
-    "STDERR": lambda x: x.sem(),      # standard error of the mean
-    "VAR":    lambda x: x.var(),      # sample variance (VARDEF=DF, n-1)
+    "SUM": lambda x: x.sum(),
+    "MEAN": lambda x: x.mean(),
+    "MIN": lambda x: x.min(),
+    "MAX": lambda x: x.max(),
+    "STD": lambda x: x.std(),  # sample std dev (VARDEF=DF, n-1)
+    "STDERR": lambda x: x.sem(),  # standard error of the mean
+    "VAR": lambda x: x.var(),  # sample variance (VARDEF=DF, n-1)
     "MEDIAN": lambda x: x.median(),
-    "P1":     lambda x: x.quantile(0.01),
-    "P5":     lambda x: x.quantile(0.05),
-    "P10":    lambda x: x.quantile(0.10),
-    "P25":    lambda x: x.quantile(0.25),
-    "P75":    lambda x: x.quantile(0.75),
-    "P90":    lambda x: x.quantile(0.90),
-    "P95":    lambda x: x.quantile(0.95),
-    "P99":    lambda x: x.quantile(0.99),
+    "P1": lambda x: x.quantile(0.01),
+    "P5": lambda x: x.quantile(0.05),
+    "P10": lambda x: x.quantile(0.10),
+    "P25": lambda x: x.quantile(0.25),
+    "P75": lambda x: x.quantile(0.75),
+    "P90": lambda x: x.quantile(0.90),
+    "P95": lambda x: x.quantile(0.95),
+    "P99": lambda x: x.quantile(0.99),
     "QRANGE": lambda x: x.quantile(0.75) - x.quantile(0.25),
-    "GMEAN":  lambda x: np.exp(np.log(x[x > 0]).mean()) if (x > 0).any() else np.nan,
-    "HMEAN":  lambda x: _hmean(x),
+    "GMEAN": lambda x: np.exp(np.log(x[x > 0]).mean()) if (x > 0).any() else np.nan,
+    "HMEAN": lambda x: _hmean(x),
 }
 
 # Each function signature: (values: pd.Series, weights: pd.Series) -> float.
@@ -90,6 +91,7 @@ _BASE_STATS: dict[str, Callable] = {
 # This cleaning step is applied once in _clean_weights() before any of the
 # functions below are called.
 
+
 def _drop_nan_x(
     x: pd.Series,
     w: pd.Series,
@@ -106,6 +108,7 @@ def _drop_nan_x(
     mask = x.notna()
     return x[mask], w[mask]
 
+
 def _wmean(
     x: pd.Series,
     w: pd.Series,
@@ -114,6 +117,7 @@ def _wmean(
     x, w = _drop_nan_x(x, w)
     wsum = w.sum()
     return (x * w).sum() / wsum if wsum else np.nan
+
 
 def _wvar(
     x: pd.Series,
@@ -127,7 +131,7 @@ def _wvar(
     wsum = w.sum()
     if not wsum:
         return np.nan
-    denom = wsum ** 2 - (w ** 2).sum()
+    denom = wsum**2 - (w**2).sum()
     if denom <= 0:
         # Degenerate case (e.g. a single nonzero-weight observation):
         # not enough effective degrees of freedom to estimate variance.
@@ -136,9 +140,11 @@ def _wvar(
     numerator = (w * (x - xbar) ** 2).sum()
     return (wsum / denom) * numerator
 
+
 def _wstd(x, w):
     v = _wvar(x, w)
     return np.sqrt(v) if pd.notna(v) else np.nan
+
 
 def _wstderr(x, w):
     # Standard error of the weighted mean: SD_w / sqrt(sum w)
@@ -146,6 +152,7 @@ def _wstderr(x, w):
     v = _wvar(x, w)
     wsum = w.sum()
     return np.sqrt(v / wsum) if pd.notna(v) and wsum else np.nan
+
 
 def _wpercentile(x, w, q):
     """Weighted percentile via linear interpolation on the weighted ECDF."""
@@ -161,6 +168,7 @@ def _wpercentile(x, w, q):
     idx = min(idx, len(xs) - 1)
     return xs[idx]
 
+
 def _wgmean(x, w):
     # Weighted geometric mean: exp( (sum w*ln x) / (sum w) )
     x, w = _drop_nan_x(x, w)
@@ -172,6 +180,7 @@ def _wgmean(x, w):
     if not wsum:
         return np.nan
     return np.exp((ww * np.log(xw)).sum() / wsum)
+
 
 def _whmean(x, w):
     # Weighted harmonic mean: (sum w) / (sum w/x)
@@ -185,6 +194,7 @@ def _whmean(x, w):
         return np.nan
     return wsum / (ww / xw).sum()
 
+
 def _clean_weights(weights: pd.Series) -> pd.Series:
     """Apply SAS PROC TABULATE's WEIGHT statement rules to a raw weight column.
 
@@ -196,40 +206,48 @@ def _clean_weights(weights: pd.Series) -> pd.Series:
     cleaned[cleaned < 0] = 0
     return cleaned
 
+
 _WEIGHTED_STATS: dict[str, Callable] = {
-    "N":      lambda x, w: x.count(),   # alias for COUNT, NEVER weighted
-    "COUNT":  lambda x, w: x.count(),   # NEVER weighted - plain count of non-missing values
-    "SIZE":   lambda x, w: x.size,      # NEVER weighted - plain count of ALL rows
-    "NMISS":  lambda x, w: x.isna().sum(),  # also never weighted - plain count
-    "SUM":    lambda x, w: (x * w).sum(),
-    "MEAN":   _wmean,
-    "MIN":    lambda x, w: x.min(),
-    "MAX":    lambda x, w: x.max(),
-    "STD":    _wstd,
+    "N": lambda x, w: x.count(),  # alias for COUNT, NEVER weighted
+    "COUNT": lambda x, w: x.count(),  # NEVER weighted - plain count of non-missing values
+    "SIZE": lambda x, w: x.size,  # NEVER weighted - plain count of ALL rows
+    "NMISS": lambda x, w: x.isna().sum(),  # also never weighted - plain count
+    "SUM": lambda x, w: (x * w).sum(),
+    "MEAN": _wmean,
+    "MIN": lambda x, w: x.min(),
+    "MAX": lambda x, w: x.max(),
+    "STD": _wstd,
     "STDERR": _wstderr,
-    "VAR":    _wvar,
+    "VAR": _wvar,
     "MEDIAN": lambda x, w: _wpercentile(x, w, 0.50),
-    "P1":     lambda x, w: _wpercentile(x, w, 0.01),
-    "P5":     lambda x, w: _wpercentile(x, w, 0.05),
-    "P10":    lambda x, w: _wpercentile(x, w, 0.10),
-    "P25":    lambda x, w: _wpercentile(x, w, 0.25),
-    "P75":    lambda x, w: _wpercentile(x, w, 0.75),
-    "P90":    lambda x, w: _wpercentile(x, w, 0.90),
-    "P95":    lambda x, w: _wpercentile(x, w, 0.95),
-    "P99":    lambda x, w: _wpercentile(x, w, 0.99),
+    "P1": lambda x, w: _wpercentile(x, w, 0.01),
+    "P5": lambda x, w: _wpercentile(x, w, 0.05),
+    "P10": lambda x, w: _wpercentile(x, w, 0.10),
+    "P25": lambda x, w: _wpercentile(x, w, 0.25),
+    "P75": lambda x, w: _wpercentile(x, w, 0.75),
+    "P90": lambda x, w: _wpercentile(x, w, 0.90),
+    "P95": lambda x, w: _wpercentile(x, w, 0.95),
+    "P99": lambda x, w: _wpercentile(x, w, 0.99),
     "QRANGE": lambda x, w: _wpercentile(x, w, 0.75) - _wpercentile(x, w, 0.25),
-    "GMEAN":  _wgmean,
-    "HMEAN":  _whmean,
+    "GMEAN": _wgmean,
+    "HMEAN": _whmean,
 }
 
 _PERCENT_STATS = {
-    "PCTN", "ROWPCTN", "COLPCTN",
-    "PCTSUM", "ROWPCTSUM", "COLPCTSUM",
+    "PCTN",
+    "ROWPCTN",
+    "COLPCTN",
+    "PCTSUM",
+    "ROWPCTSUM",
+    "COLPCTSUM",
 }
 
 ALL_STATS = set(_BASE_STATS) | _PERCENT_STATS
 
-def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, weight=None):
+
+def _compute_series(
+    data, all_groups, var, stat, r_groups, c_groups, missing, weight=None
+):
     """Compute an aggregated Series for a single (row_spec, col_spec) pair.
 
     When neither spec carries an ALL/TOTAL token — i.e. both dimensions
@@ -277,8 +295,10 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         if var is not None:
             if weight is not None and wfunc is not None:
                 cols = [var, weight]
+
                 def _apply(g):
                     return wfunc(g[var], g[weight])
+
                 if groups:
                     return data.groupby(groups, dropna=dropna)[cols].apply(_apply)
                 return pd.Series({"__total__": _apply(data[cols])})
@@ -312,7 +332,7 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
                 f"missing values OF a measure column, so it always needs "
                 f"one, e.g. income*NMISS."
             )
-        func  = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
+        func = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
         wfunc = _WEIGHTED_STATS.get(stat) if var is not None else None
         return _agg(all_groups, func, wfunc)
 
@@ -325,14 +345,14 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         )
 
     if count_based:
-        raw_func  = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
+        raw_func = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
         raw_wfunc = _WEIGHTED_STATS["N"] if var is not None else None
     else:
-        raw_func  = _BASE_STATS["SUM"]
+        raw_func = _BASE_STATS["SUM"]
         raw_wfunc = _WEIGHTED_STATS["SUM"]
 
     series = _agg(all_groups, raw_func, raw_wfunc)
-    grand  = _grand(raw_func if var is not None else (lambda x: len(x)), raw_wfunc)
+    grand = _grand(raw_func if var is not None else (lambda x: len(x)), raw_wfunc)
 
     if stat in ("PCTN", "PCTSUM"):
         return 100.0 * series / grand
@@ -341,11 +361,13 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         if r_groups:
             denom = _agg(r_groups, raw_func, raw_wfunc)
             n_r = len(r_groups)
+
             def row_pct(val, idx):
                 key = idx[:n_r] if isinstance(idx, tuple) else (idx,)
                 key = key[0] if len(key) == 1 else key
                 d = denom.get(key, np.nan)
                 return 100.0 * val / d if d else np.nan
+
             return pd.Series(
                 {idx: row_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
@@ -356,14 +378,16 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
         if c_groups:
             denom = _agg(c_groups, raw_func, raw_wfunc)
             n_r = len(r_groups)
+
             def col_pct(val, idx):
                 if isinstance(idx, tuple):
-                    key = idx[n_r:n_r + len(c_groups)]
+                    key = idx[n_r : n_r + len(c_groups)]
                 else:
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
                 d = denom.get(key, np.nan)
                 return 100.0 * val / d if d else np.nan
+
             return pd.Series(
                 {idx: col_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
@@ -372,8 +396,10 @@ def _compute_series(data, all_groups, var, stat, r_groups, c_groups, missing, we
 
     raise ValueError(f"Unknown statistic: {stat}")
 
-def _compute_all_series(data, groups_to_keep, var, stat, missing,
-                        r_groups=None, c_groups=None, weight=None):
+
+def _compute_all_series(
+    data, groups_to_keep, var, stat, missing, r_groups=None, c_groups=None, weight=None
+):
     """Compute an aggregated Series involving an ALL/TOTAL margin.
 
     This handles the three ALL cases:
@@ -419,8 +445,10 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         if var is not None:
             if weight is not None and wfunc is not None:
                 cols = [var, weight]
+
                 def _apply(g):
                     return wfunc(g[var], g[weight])
+
                 if groups:
                     return data.groupby(groups, dropna=dropna)[cols].apply(_apply)
                 return pd.Series({"__total__": _apply(data[cols])})
@@ -443,7 +471,7 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
                 f"missing values OF a measure column, so it always needs "
                 f"one, e.g. income*NMISS."
             )
-        func  = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
+        func = _BASE_STATS[stat] if var is not None else (lambda x: x.count())
         wfunc = _WEIGHTED_STATS.get(stat) if var is not None else None
         return _agg(groups_to_keep, wfunc)
 
@@ -456,15 +484,19 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         )
 
     if count_based:
-        raw_func  = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
+        raw_func = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
         raw_wfunc = _WEIGHTED_STATS["N"] if var is not None else None
         # N/NMISS-based grand total is ALWAYS a plain row count, never
         # weighted - even when weight= is supplied and var is set.
         grand = data[var].count() if var is not None else len(data)
     else:
-        raw_func  = _BASE_STATS["SUM"]
+        raw_func = _BASE_STATS["SUM"]
         raw_wfunc = _WEIGHTED_STATS["SUM"]
-        grand = raw_wfunc(data[var], data[weight]) if weight is not None else data[var].sum()
+        grand = (
+            raw_wfunc(data[var], data[weight])
+            if weight is not None
+            else data[var].sum()
+        )
 
     func = raw_func  # used inside _agg's non-weighted branch
 
@@ -476,6 +508,7 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         # Divide each cell by the total for its column group.
         if c_groups:
             denom = _agg(c_groups, raw_wfunc)  # total per column group
+
             def _col_denom(idx):
                 # idx is from groups_to_keep = r_context + c_groups
                 # c_groups part starts after r_context groups
@@ -486,17 +519,18 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
                 return denom.get(key, np.nan)
+
             def _safe_pct(val, denom_val):
                 if denom_val is np.nan or denom_val == 0:
                     return np.nan
                 return 100.0 * val / denom_val
+
             return pd.Series(
-                {idx: _safe_pct(val, _col_denom(idx))
-                 for idx, val in series.items()},
+                {idx: _safe_pct(val, _col_denom(idx)) for idx, val in series.items()},
                 name=series.name,
             )
         # No column groups — divide by overall grand total
-        with np.errstate(invalid='ignore', divide='ignore'):
+        with np.errstate(invalid="ignore", divide="ignore"):
             return 100.0 * series / grand
 
     if stat in ("ROWPCTN", "ROWPCTSUM"):
@@ -504,31 +538,37 @@ def _compute_all_series(data, groups_to_keep, var, stat, missing,
         # When ALL is on cols, r_groups are the row breakdown groups.
         if r_groups:
             denom = _agg(r_groups, raw_wfunc)  # total per row group
+
             def _row_denom(idx):
                 if isinstance(idx, tuple):
-                    key = idx[:len(r_groups)]
+                    key = idx[: len(r_groups)]
                 else:
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
                 return denom.get(key, np.nan)
+
             def _safe_row_pct(val, denom_val):
                 if denom_val is np.nan or denom_val == 0:
                     return np.nan
                 return 100.0 * val / denom_val
+
             return pd.Series(
-                {idx: _safe_row_pct(val, _row_denom(idx))
-                 for idx, val in series.items()},
+                {
+                    idx: _safe_row_pct(val, _row_denom(idx))
+                    for idx, val in series.items()
+                },
                 name=series.name,
             )
-        with np.errstate(invalid='ignore', divide='ignore'):
+        with np.errstate(invalid="ignore", divide="ignore"):
             return 100.0 * series / grand
 
     # PCTN / PCTSUM: always use overall grand total
     return 100.0 * series / grand
 
+
 def _parse_denom_def(denom_str: str) -> list[str]:
     """Parse the content of a <...> denominator definition.
-    
+
     Into an ordered list of uppercase token strings.
 
     Each token is one of:
@@ -548,7 +588,6 @@ def _parse_denom_def(denom_str: str) -> list[str]:
     'origin total' -> ['ORIGIN', 'TOTAL']
     """
     return [t.upper() for t in denom_str.strip().split()]
-
 
 
 def _compute_custom_pct(
@@ -603,14 +642,14 @@ def _compute_custom_pct(
     pctsum<income>  (ratio of two measures, same groups always)
     pctn<gender all>  (gender subtotal, fallback to grand total)
     """
-    measure_upper  = [m.upper() for m in (measure or [])]
-    groupby_upper  = [g.upper() for g in (groupby  or [])]
-    groupby_map    = {g.upper(): g for g in (groupby or [])}
-    measure_map    = {m.upper(): m for m in (measure or [])}
+    measure_upper = [m.upper() for m in (measure or [])]
+    groupby_upper = [g.upper() for g in (groupby or [])]
+    groupby_map = {g.upper(): g for g in (groupby or [])}
+    measure_map = {m.upper(): m for m in (measure or [])}
 
     denom_tokens = _parse_denom_def(denom_def)
-    all_groups   = list(dict.fromkeys(r_groups + c_groups))
-    dropna       = not missing
+    all_groups = list(dict.fromkeys(r_groups + c_groups))
+    dropna = not missing
 
     def _agg_series(groups, var_col):
         if var_col is not None:
@@ -621,10 +660,14 @@ def _compute_custom_pct(
                 d[weight] = _clean_weights(d[weight])
                 d = d.dropna(subset=[var_col])
                 if groups:
-                    return (d.groupby(groups, dropna=dropna)
-                              .apply(lambda g: (g[var_col] * g[weight]).sum(),
-                                     include_groups=False)
-                              .rename(None))
+                    return (
+                        d.groupby(groups, dropna=dropna)
+                        .apply(
+                            lambda g: (g[var_col] * g[weight]).sum(),
+                            include_groups=False,
+                        )
+                        .rename(None)
+                    )
                 return pd.Series({"__total__": (d[var_col] * d[weight]).sum()})
             else:
                 if groups:
@@ -656,8 +699,8 @@ def _compute_custom_pct(
     # We look at r_path_order and c_path_order combined, taking the last entry
     # that is either 'group' (a real groupby column) or 'all' (a Total row).
     combined_po = list(r_path_order or []) + list(c_path_order or [])
-    innermost_kind    = None   # 'group' or 'all'
-    innermost_orig    = None   # original column name for 'group', None for 'all'
+    innermost_kind = None  # 'group' or 'all'
+    innermost_orig = None  # original column name for 'group', None for 'all'
 
     for entry in reversed(combined_po):
         kind = entry[0]
@@ -676,14 +719,14 @@ def _compute_custom_pct(
     #     or fall back to grand total
     #   - 'group' innermost with orig_col X: find the token matching X and
     #     collapse X from all_groups to get the parent subtotal
-    denom_var_col = var   # default: same measure as numerator
-    denom_groups  = []    # default: grand total
+    denom_var_col = var  # default: same measure as numerator
+    denom_groups = []  # default: grand total
 
     # First check if any token is a measure name (always takes priority)
     measure_tok = next((t for t in denom_tokens if t in measure_upper), None)
     if measure_tok is not None:
         denom_var_col = measure_map[measure_tok]
-        denom_groups  = all_groups
+        denom_groups = all_groups
 
     elif innermost_kind == "group" and innermost_orig is not None:
         # This spec produces rows broken down by innermost_orig.
@@ -691,18 +734,18 @@ def _compute_custom_pct(
         inner_upper = innermost_orig.upper()
         if inner_upper in denom_tokens and inner_upper in groupby_upper:
             # Collapse innermost_orig: denominator = subtotal excluding this var
-            denom_groups  = [g for g in all_groups if g != innermost_orig]
+            denom_groups = [g for g in all_groups if g != innermost_orig]
             denom_var_col = var
         else:
             # Token not found for this variable; try left-to-right as fallback
             for tok in denom_tokens:
                 if tok in groupby_upper:
                     col = groupby_map[tok]
-                    denom_groups  = [g for g in all_groups if g != col]
+                    denom_groups = [g for g in all_groups if g != col]
                     denom_var_col = var
                     break
                 elif tok in ("ALL", "TOTAL"):
-                    denom_groups  = []
+                    denom_groups = []
                     denom_var_col = var
                     break
 
@@ -713,7 +756,7 @@ def _compute_custom_pct(
         found = False
         for tok in denom_tokens:
             if tok in ("ALL", "TOTAL"):
-                denom_groups  = []
+                denom_groups = []
                 denom_var_col = var
                 found = True
                 break
@@ -722,7 +765,7 @@ def _compute_custom_pct(
             for tok in denom_tokens:
                 if tok in groupby_upper:
                     col = groupby_map[tok]
-                    denom_groups  = [g for g in all_groups if g != col]
+                    denom_groups = [g for g in all_groups if g != col]
                     denom_var_col = var
                     break
 
@@ -731,20 +774,20 @@ def _compute_custom_pct(
         for tok in denom_tokens:
             if tok in measure_upper:
                 denom_var_col = measure_map[tok]
-                denom_groups  = all_groups
+                denom_groups = all_groups
                 break
             elif tok in groupby_upper:
                 col = groupby_map[tok]
-                denom_groups  = [g for g in all_groups if g != col]
+                denom_groups = [g for g in all_groups if g != col]
                 denom_var_col = var
                 break
             elif tok in ("ALL", "TOTAL"):
-                denom_groups  = []
+                denom_groups = []
                 denom_var_col = var
                 break
 
     # Compute numerator and denominator series
-    num_series   = _agg_series(all_groups,   var)
+    num_series = _agg_series(all_groups, var)
     denom_series = _agg_series(denom_groups, denom_var_col)
 
     # Build normalised-key lookup so NaN groupby values match correctly
@@ -777,5 +820,3 @@ def _compute_custom_pct(
         except (TypeError, ValueError):
             results[idx] = np.nan
     return pd.Series(results)
-
-

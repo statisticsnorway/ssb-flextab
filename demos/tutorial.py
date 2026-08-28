@@ -2,49 +2,37 @@
 # # Flextab Tutorial
 
 # %%
-import pandas as pd
 from pprint import pprint
 
-from ssb_flextab import FlextabResult, flextab, flextab_to_string
+import pandas as pd
+
+from ssb_flextab import flextab
 
 # %% [markdown]
 # ## Data set for tutorial
 
 # %%
-df = pd.DataFrame({
-    "sex": ["1","1","2","1",None, "2","2","1", "2", "2"],
-    "age_group": ["2","1","2","3","1","2", "2", "2", "3", None],
-    "region": [None, "2", "1", "2", "2", "3", "3", "2", "2", "1"],
-    "education": ["3", "2", "3", "1", "3", "3", "3", "1", "3", "2"],
-    "income": [300, 100, 450, 200, 650, 750, None, 850, 400, 350],
-    "tax": [100, 10, 200, 90, 340, 370, 30, None, 150, 150],
-    "weight": [1.5, 3.2, 1.7, 2.2, 6.1, 4.2, 1.9, 4.8, None, 8.2]
-})
+df = pd.DataFrame(
+    {
+        "sex": ["1", "1", "2", "1", None, "2", "2", "1", "2", "2"],
+        "age_group": ["2", "1", "2", "3", "1", "2", "2", "2", "3", None],
+        "region": [None, "2", "1", "2", "2", "3", "3", "2", "2", "1"],
+        "education": ["3", "2", "3", "1", "3", "3", "3", "1", "3", "2"],
+        "income": [300, 100, 450, 200, 650, 750, None, 850, 400, 350],
+        "tax": [100, 10, 200, 90, 340, 370, 30, None, 150, 150],
+        "weight": [1.5, 3.2, 1.7, 2.2, 6.1, 4.2, 1.9, 4.8, None, 8.2],
+    }
+)
 
 labels = {
-    'sex': 
-    {
-        '1': 'Males',
-        '2': 'Females'
+    "sex": {"1": "Males", "2": "Females"},
+    "age_group": {"1": "0-19", "2": "20-66", "3": "67+"},
+    "region": {"1": "West", "2": "East", "3": "Central"},
+    "education": {
+        "3": "Higher education",
+        "2": "Secondary school",
+        "1": "Elementary school",
     },
-    'age_group':
-    {
-        '1': '0-19',
-        '2': '20-66',
-        '3': '67+'
-    },
-    'region':
-    {
-        '1': 'West',
-        '2': 'East',
-        '3': 'Central'
-    },
-    'education':
-    {
-        '3': 'Higher education',
-        '2': 'Secondary school',
-        '1': 'Elementary school'
-    }
 }
 pprint(df)
 pprint(labels)
@@ -53,42 +41,28 @@ pprint(labels)
 # With just defining a groupby column it will count the number of observations (N)
 
 # %%
-flextab(
-    data=df,
-    groupby="region"
-)
+flextab(data=df, groupby="region")
 
 # %% [markdown]
 # With just a measure column it will count the number of observations (N) and mean of the measure column
 
 # %%
-flextab(
-    data=df,
-    measure="income"
-)
+flextab(data=df, measure="income")
 
 # %% [markdown]
-# When we add a measure column it will count the number of observations with values and the mean for the measure column and group it by the groupby column 
+# When we add a measure column it will count the number of observations with values and the mean for the measure column and group it by the groupby column
 
 # %%
-flextab(
-    data=df,
-    measure="income",
-    groupby="region"
-)
+flextab(data=df, measure="income", groupby="region")
 
 # %% [markdown]
 # When we add a groupby column they must be put within a list. It will make a stacked table first grouped by the first groupby column and then by second, and count the number of observations and average for the measure column.
 
 # %%
-flextab(
-    data=df,
-    measure="income",
-    groupby=["region", "sex"]
-)
+flextab(data=df, measure="income", groupby=["region", "sex"])
 
 # %% [markdown]
-# So far the tables are made as default tables. Now, let us introduce the table argument. With it we define the table content and layout ourselves in a very flexible way. The table argument must be put within quotes. When column names are used in the table argument they shall **not** be within qoutes. Beware that when we use qoutes within the table argument it should use another quote (like double quotes for the argument and single quotes within the argument). 
+# So far the tables are made as default tables. Now, let us introduce the table argument. With it we define the table content and layout ourselves in a very flexible way. The table argument must be put within quotes. When column names are used in the table argument they shall **not** be within qoutes. Beware that when we use qoutes within the table argument it should use another quote (like double quotes for the argument and single quotes within the argument).
 #
 # We start with a simple table in one dimension where make a distribution of the regions. The default count for groupby columns is the number of observations (n)
 
@@ -98,7 +72,7 @@ flextab(
     groupby="region",
     table="""
     region
-    """
+    """,
 )
 
 # %% [markdown]
@@ -110,7 +84,7 @@ flextab(
     measure="income",
     table="""
     income * (n nmiss sum mean)
-    """
+    """,
 )
 
 # %% [markdown]
@@ -123,7 +97,7 @@ flextab(
     measure="income",
     table="""
     income * region * (n nmiss sum mean)
-    """
+    """,
 )
 
 # %% [markdown]
@@ -135,9 +109,9 @@ flextab(
     groupby=["region", "sex"],
     table="""
     region
-    , 
+    ,
     sex
-    """
+    """,
 )
 
 # %% [markdown]
@@ -149,9 +123,9 @@ flextab(
     groupby=["region", "sex", "education"],
     table="""
     region * education
-    , 
+    ,
     sex
-    """
+    """,
 )
 
 # %% [markdown]
@@ -163,9 +137,9 @@ flextab(
     groupby=["region", "sex", "education", "age_group"],
     table="""
     region * education
-    , 
+    ,
     sex * age_group
-    """ 
+    """,
 )
 
 # %% [markdown]
@@ -177,13 +151,13 @@ flextab(
     groupby=["region", "sex", "education", "age_group"],
     table="""
     region education
-    , 
+    ,
     sex age_group
-    """ 
+    """,
 )
 
 # %% [markdown]
-# Now we introduce the `total`keyword for adding totals to our table. 
+# Now we introduce the `total`keyword for adding totals to our table.
 # We can also combine nesting and stacking. In the next example there will be stacked *sex* and *education* for each region
 
 # %%
@@ -192,9 +166,9 @@ flextab(
     groupby=["region", "sex", "education"],
     table="""
     total region * (sex education)
-    , 
+    ,
     n
-    """
+    """,
 )
 
 # %% [markdown]
@@ -206,9 +180,9 @@ flextab(
     groupby=["region", "sex", "education"],
     table="""
     total region * (total education)
-    , 
+    ,
     total sex
-    """
+    """,
 )
 
 # %% [markdown]
@@ -220,9 +194,9 @@ flextab(
     groupby=["region", "sex", "education"],
     table="""
     (total region) * (total education)
-    , 
+    ,
     total sex
-    """
+    """,
 )
 
 # %% [markdown]
@@ -234,10 +208,10 @@ flextab(
     groupby=["region", "sex"],
     measure="income",
     table="""
-    total region 
-    , 
+    total region
+    ,
     total sex * income * (n sum mean)
-    """
+    """,
 )
 
 # %% [markdown]
@@ -250,9 +224,9 @@ flextab(
     measure="income",
     table="""
     total region
-    , 
+    ,
     (total sex) * income * (n sum mean)
-    """
+    """,
 )
 
 # %% [markdown]
@@ -265,9 +239,9 @@ flextab(
     measure="income",
     table="""
     total region
-    , 
+    ,
     income * (n nmiss size sum median mean gmean hmean min max std stderr var p1 p99 qrange)
-    """
+    """,
 )
 
 # %% [markdown]
@@ -279,10 +253,10 @@ flextab(
     groupby=["region", "sex"],
     measure="income",
     table="""
-    income * (n nmiss size sum median mean gmean hmean min max std stderr var p1 p99 qrange) 
-    , 
-    total region 
-    """
+    income * (n nmiss size sum median mean gmean hmean min max std stderr var p1 p99 qrange)
+    ,
+    total region
+    """,
 )
 
 # %% [markdown]
@@ -298,9 +272,9 @@ flextab(
     weight="weight",
     table="""
     income * (n nmiss size sum median mean gmean hmean min max std stderr var p1 p25 p75 p99 qrange)
-    , 
-    total region 
-    """
+    ,
+    total region
+    """,
 )
 
 # %% [markdown]
@@ -326,9 +300,9 @@ flextab(
     measure="income",
     table="""
     total region
-    , 
+    ,
     (total sex) * (pctn income*pctsum)
-    """
+    """,
 )
 
 # %%
@@ -337,10 +311,10 @@ flextab(
     groupby=["region", "sex"],
     measure="income",
     table="""
-    total region 
-    , 
+    total region
+    ,
     (pctn income*pctsum) * (total sex)
-    """
+    """,
 )
 
 # %%
@@ -350,9 +324,9 @@ flextab(
     measure="income",
     table="""
     total region
-    , 
+    ,
     (rowpctn income * rowpctsum) * (total sex)
-    """
+    """,
 )
 
 # %%
@@ -362,9 +336,9 @@ flextab(
     measure="income",
     table="""
     total region
-    , 
+    ,
     (colpctn income * colpctsum) * (total sex)
-    """
+    """,
 )
 
 # %%
@@ -375,9 +349,9 @@ flextab(
     weight="weight",
     table="""
     total region
-    , 
+    ,
     (colpctn income * colpctsum) * (total sex)
-    """
+    """,
 )
 
 # %% [markdown]
@@ -389,9 +363,9 @@ flextab(
     groupby=["region", "sex", "education"],
     table="""
     (total sex) * (total region)
-    , 
+    ,
     (total education)*pctn<region>
-    """
+    """,
 )
 
 # %% [markdown]
@@ -403,10 +377,10 @@ flextab(
     groupby="region",
     measure=["income", "tax"],
     table="""
-    (total region) 
-    , 
+    (total region)
+    ,
     sum * (income tax) pctsum<income> * tax
-    """
+    """,
 )
 
 # %% [markdown]
@@ -418,10 +392,10 @@ flextab(
     groupby="region",
     measure=["income", "tax"],
     table="""
-    (total region) 
-    , 
+    (total region)
+    ,
     sum * (income tax) * format=9.0_ pctsum<income> * tax * format=9.1
-    """
+    """,
 )
 
 # %% [markdown]
@@ -433,10 +407,10 @@ flextab(
     groupby="region",
     measure=["income", "tax"],
     table="""
-    (total region) 
-    , 
+    (total region)
+    ,
     sum * (income tax) * format=9,0s pctsum<income> * tax * format=9,1
-    """
+    """,
 )
 
 # %% [markdown]
@@ -448,11 +422,11 @@ flextab(
     groupby="region",
     measure=["income", "tax"],
     table="""
-    total region='' 
-    , 
+    total region=''
+    ,
     sum='' * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
-    row_header='Region'
+    row_header="Region",
 )
 
 # %% [markdown]
@@ -464,12 +438,12 @@ flextab(
     groupby="region",
     measure=["income", "tax"],
     table="""
-    (total region='') 
-    , 
+    (total region='')
+    ,
     sum='' * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
-    row_header='Region',
-    include_missing_in_groupby = False
+    row_header="Region",
+    include_missing_in_groupby=False,
 )
 
 # %% [markdown]
@@ -481,13 +455,13 @@ flextab(
     groupby=["education", "region"],
     measure="income",
     table="""
-    (total education='') 
-    , 
+    (total education='')
+    ,
     (total region='') * income='' * rowpctsum='' * format=9,1
     """,
-    row_header='Education',
+    row_header="Education",
     labels=labels,
-    sort_by='code'
+    sort_by="code",
 )
 
 # %% [markdown]
@@ -499,13 +473,13 @@ flextab(
     groupby=["education", "region"],
     measure="income",
     table="""
-    (total education='') 
-    , 
+    (total education='')
+    ,
     (total region='') * income='' * rowpctsum='' * format=9,1
     """,
-    row_header='Education',
+    row_header="Education",
     labels=labels,
-    sort_by='label'
+    sort_by="label",
 )
 
 # %%
@@ -514,13 +488,13 @@ flextab(
     groupby=["education", "region"],
     measure="income",
     table="""
-    (total education='') 
-    , 
+    (total education='')
+    ,
     (total region='') * income='' * rowpctsum='' * format=9,1
     """,
-    row_header='Education',
+    row_header="Education",
     labels=labels,
-    sort_by='index'
+    sort_by="index",
 )
 
 # %% [markdown]
@@ -532,14 +506,14 @@ flextab(
     groupby=["education", "region"],
     measure="income",
     table="""
-    (total education='') 
-    , 
+    (total education='')
+    ,
     (total region='') * income='' * rowpctsum='' * format=9,1
     """,
-    row_header='Education',
+    row_header="Education",
     labels=labels,
-    sort_by='index',
-    na_rep='-'
+    sort_by="index",
+    na_rep="-",
 )
 
 # %% [markdown]
@@ -562,32 +536,32 @@ flextab(
 # - **RGB tuples** Colours represented as Red, Green, Blue in a tuple, row_bg=(110, 230, 30)
 
 # %%
-tabstyle={
-    'header_bg': '#ecfeed', 
-    'row_header_bg': '#ecfeed',
-#    'row_bg': '#ecfeed',
-    'row_bg': (110, 230, 30),
-    'cell_bg': ('#ecfeed', '#ffffff')
-    }
-    
+tabstyle = {
+    "header_bg": "#ecfeed",
+    "row_header_bg": "#ecfeed",
+    #    'row_bg': '#ecfeed',
+    "row_bg": (110, 230, 30),
+    "cell_bg": ("#ecfeed", "#ffffff"),
+}
+
 flextab(
     data=df,
     groupby="education",
     measure=["income", "tax"],
     table="""
-    (total education='') 
-    , 
+    (total education='')
+    ,
     sum * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
-    row_header='Education',
-    include_missing_in_groupby = False,
+    row_header="Education",
+    include_missing_in_groupby=False,
     labels=labels,
-    sort_by='index',
-    style=tabstyle
+    sort_by="index",
+    style=tabstyle,
 )
 
 # %% [markdown]
-# We can export the table to different formats, like excel or markdown. Here is an example on export to excel. 
+# We can export the table to different formats, like excel or markdown. Here is an example on export to excel.
 
 # %%
 tab = flextab(
@@ -595,18 +569,18 @@ tab = flextab(
     groupby="education",
     measure=["income", "tax"],
     table="""
-    (total education='') 
-    , 
+    (total education='')
+    ,
     sum * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
-    row_header='Education',
-    include_missing_in_groupby = False,
+    row_header="Education",
+    include_missing_in_groupby=False,
     labels=labels,
-    sort_by='index',
-    style=tabstyle
+    sort_by="index",
+    style=tabstyle,
 )
 
-excel_filename="../reports/tab1.xlsx"
+excel_filename = "../reports/tab1.xlsx"
 
 tab.to_excel(excel_filename)
 
@@ -620,19 +594,19 @@ tab = flextab(
     measure=["income", "tax"],
     table="""
     (total education='') * (total sex='')
-    , 
+    ,
     sum * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
-    row_header='Education',
-    include_missing_in_groupby = False,
+    row_header="Education",
+    include_missing_in_groupby=False,
     labels=labels,
-    sort_by='index',
-    style=tabstyle
+    sort_by="index",
+    style=tabstyle,
 )
 
 tab_md = tab.to_markdown()
 
-markdown_filename="../reports/tab1.md"
+markdown_filename = "../reports/tab1.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab_md)
 
@@ -640,7 +614,6 @@ with open(markdown_filename, "w", encoding="utf-8") as f:
 # When we use `_repr_html`, the table will be rendered as html and the layout will be kept.
 
 # %%
-from ssb_flextab.flextab import flextab_to_markdown
 markdown_filename = "../reports/tab1b.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab._repr_html_())

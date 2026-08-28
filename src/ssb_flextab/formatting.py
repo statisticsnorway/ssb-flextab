@@ -1,6 +1,3 @@
-from typing import Any
-
-
 import re
 
 import pandas as pd
@@ -43,15 +40,17 @@ def _parse_fmt_spec(spec: str):
     Callable (value: Any) -> str
         A formatting function.  Non-numeric values are returned as str(value).
     """
-    m = re.fullmatch(r'[0-9]+([.,])([0-9]+)([_s]*)', spec.strip())
+    m = re.fullmatch(r"[0-9]+([.,])([0-9]+)([_s]*)", spec.strip())
     if not m:
-        raise ValueError(f"Invalid format spec {spec!r}. Expected W.D[_|s] or W,D[_|s].")
-    dec_sep   = m.group(1)          # '.' or ',' — the decimal separator
-    decimals  = int(m.group(2))
+        raise ValueError(
+            f"Invalid format spec {spec!r}. Expected W.D[_|s] or W,D[_|s]."
+        )
+    dec_sep = m.group(1)  # '.' or ',' — the decimal separator
+    decimals = int(m.group(2))
     modifiers = m.group(3)
-    use_comma       = (dec_sep == ',')  # decimal comma instead of decimal point
-    use_thousands   = '_' in modifiers  # thousands grouping (opposite char of dec_sep)
-    use_space_thous = 's' in modifiers  # thousands grouping with space
+    use_comma = dec_sep == ","  # decimal comma instead of decimal point
+    use_thousands = "_" in modifiers  # thousands grouping (opposite char of dec_sep)
+    use_space_thous = "s" in modifiers  # thousands grouping with space
 
     def _fmt(value):
         try:
@@ -69,16 +68,17 @@ def _parse_fmt_spec(spec: str):
             if use_comma:
                 # s looks like "1,234.56" (thousands=',' decimal='.').
                 # Replace thousands ',' with space, then decimal '.' with ','.
-                s = s.replace(',', ' ').replace('.', ',')
+                s = s.replace(",", " ").replace(".", ",")
             else:
-                s = s.replace(',', ' ')
+                s = s.replace(",", " ")
         elif use_comma:
             # Swap . and , for European style: 1,234.56 -> 1.234,56
-            s = s.replace(',', '\u00b6').replace('.', ',').replace('\u00b6', '.')
+            s = s.replace(",", "\u00b6").replace(".", ",").replace("\u00b6", ".")
 
         return s
 
     return _fmt
+
 
 def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
     """Build a string-valued copy of result with per-column AND per-row formats applied.
@@ -112,6 +112,7 @@ def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
     formatted = pd.DataFrame(data, index=result.index)
     formatted.columns = result.columns
     return formatted
+
 
 def flextab_to_string(result, fmt="{:.3f}", na_rep=".") -> str:
     """Render a flextab() result as a formatted string.
@@ -152,8 +153,8 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep=".") -> str:
 
 def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
     """Render a flextab() result as a plain Markdown table.
-    
-    The table contains flattened, human-readable column headers instead of 
+
+    The table contains flattened, human-readable column headers instead of
     the raw index tuples that pandas' inherited DataFrame.to_markdown()
     shows for a MultiIndex, and with format= specs from the TABLE expression
     applied to the numbers.

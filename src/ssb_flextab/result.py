@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import Any, ClassVar
+
+from typing import Any
+from typing import ClassVar
 
 import pandas as pd
 
@@ -61,15 +63,29 @@ class FlextabResult(pd.DataFrame):
             return s.upper()
         # Named colour: convert via a small lookup of common names
         _names = {
-            "black": "000000", "white": "FFFFFF",
-            "red": "FF0000", "green": "008000", "blue": "0000FF",
-            "yellow": "FFFF00", "orange": "FFA500", "purple": "800080",
-            "grey": "808080", "gray": "808080",
-            "lightgrey": "D3D3D3", "lightgray": "D3D3D3",
-            "darkgrey": "A9A9A9", "darkgray": "A9A9A9",
-            "navy": "000080", "teal": "008080", "maroon": "800000",
-            "silver": "C0C0C0", "lime": "00FF00", "cyan": "00FFFF",
-            "magenta": "FF00FF", "pink": "FFC0CB", "beige": "F5F5DC",
+            "black": "000000",
+            "white": "FFFFFF",
+            "red": "FF0000",
+            "green": "008000",
+            "blue": "0000FF",
+            "yellow": "FFFF00",
+            "orange": "FFA500",
+            "purple": "800080",
+            "grey": "808080",
+            "gray": "808080",
+            "lightgrey": "D3D3D3",
+            "lightgray": "D3D3D3",
+            "darkgrey": "A9A9A9",
+            "darkgray": "A9A9A9",
+            "navy": "000080",
+            "teal": "008080",
+            "maroon": "800000",
+            "silver": "C0C0C0",
+            "lime": "00FF00",
+            "cyan": "00FFFF",
+            "magenta": "FF00FF",
+            "pink": "FFC0CB",
+            "beige": "F5F5DC",
         }
         key = s.lower()
         if key in _names:
@@ -97,8 +113,11 @@ class FlextabResult(pd.DataFrame):
         """
         if spec is None:
             return None
-        if isinstance(spec, (list, tuple)) and len(spec) == 2 \
-                and not (isinstance(spec[0], int) and len(spec) == 3):
+        if (
+            isinstance(spec, (list, tuple))
+            and len(spec) == 2
+            and not (isinstance(spec[0], int) and len(spec) == 3)
+        ):
             return spec[idx % 2]
         return spec
 
@@ -122,11 +141,13 @@ class FlextabResult(pd.DataFrame):
         try:
             # Access the closure to get the exact formatting parameters
             fvars = formatter.__code__.co_freevars
-            fvals = {k: v.cell_contents for k, v in
-                     zip(fvars, formatter.__closure__, strict=True)}
-            decimals        = fvals.get("decimals", 0)
-            use_thousands   = fvals.get("use_thousands", False)   # _ separator
-            use_space_thous = fvals.get("use_space_thous", False) # s separator
+            fvals = {
+                k: v.cell_contents
+                for k, v in zip(fvars, formatter.__closure__, strict=True)
+            }
+            decimals = fvals.get("decimals", 0)
+            use_thousands = fvals.get("use_thousands", False)  # _ separator
+            use_space_thous = fvals.get("use_space_thous", False)  # s separator
 
             # Build the Excel number format. Excel always uses ',' for thousands
             # grouping internally regardless of locale display.
@@ -136,15 +157,15 @@ class FlextabResult(pd.DataFrame):
             else:
                 dec_part = ""
             if thous:
-                return f'#,##0{dec_part}'
+                return f"#,##0{dec_part}"
             else:
-                return f'0{dec_part}'
+                return f"0{dec_part}"
         except Exception:
             # Fall back to parsing the formatted output if closure inspection fails
             try:
                 sample = formatter(1234.5)
                 # Count decimal places
-                for sep in (',', '.'):
+                for sep in (",", "."):
                     if sep in sample:
                         return f'0.{"0" * len(sample.split(sep)[-1])}'
                 return "0"
@@ -167,7 +188,7 @@ class FlextabResult(pd.DataFrame):
 
     def _repr_html_(self):
         """Jupyter/IPython HTML display.
-        
+
         With format= specs AND inline CSS colours from the style= parameter
         applied.
 
@@ -210,12 +231,12 @@ class FlextabResult(pd.DataFrame):
 
             header_bg_spec = style.get("header_bg")
             header_fg_spec = style.get("header_fg")
-            row_bg_spec    = style.get("row_bg")
-            row_fg_spec    = style.get("row_fg")
-            rh_bg_spec     = style.get("row_header_bg")
-            rh_fg_spec     = style.get("row_header_fg")
-            cell_bg_spec   = style.get("cell_bg")
-            cell_fg_spec   = style.get("cell_fg")
+            row_bg_spec = style.get("row_bg")
+            row_fg_spec = style.get("row_fg")
+            rh_bg_spec = style.get("row_header_bg")
+            rh_fg_spec = style.get("row_header_fg")
+            cell_bg_spec = style.get("cell_bg")
+            cell_fg_spec = style.get("cell_fg")
 
             # Text of the row_header cell(s), so we can single it out among
             # the <th> cells in the header area.
@@ -226,11 +247,22 @@ class FlextabResult(pd.DataFrame):
 
             html = formatted.to_html(border=0)
 
-            any_style = any([header_bg_spec, header_fg_spec, row_bg_spec, row_fg_spec,
-                              rh_bg_spec, rh_fg_spec, cell_bg_spec, cell_fg_spec])
+            any_style = any(
+                [
+                    header_bg_spec,
+                    header_fg_spec,
+                    row_bg_spec,
+                    row_fg_spec,
+                    rh_bg_spec,
+                    rh_fg_spec,
+                    cell_bg_spec,
+                    cell_fg_spec,
+                ]
+            )
             if any_style:
                 import html as _html
                 import re as _re
+
                 lines = html.splitlines()
                 out = []
                 data_row_idx = 0
@@ -242,7 +274,7 @@ class FlextabResult(pd.DataFrame):
                     if not css_str:
                         return m.group(0)
                     return _re.sub(
-                        r'<th\b([^>]*)>',
+                        r"<th\b([^>]*)>",
                         lambda mm: f'<th{mm.group(1)} style="{css_str}">',
                         m.group(0),
                     )
@@ -260,7 +292,7 @@ class FlextabResult(pd.DataFrame):
                     elif in_thead and in_thead_row and stripped.startswith("<th"):
                         # Is this the row_header cell (holds the row_header=
                         # text), or a plain column-header cell?
-                        text = _html.unescape(_re.sub(r'<[^>]+>', '', stripped)).strip()
+                        text = _html.unescape(_re.sub(r"<[^>]+>", "", stripped)).strip()
                         if row_header_names and text in row_header_names:
                             rh_bg = _resolve(rh_bg_spec, header_row_idx)
                             rh_fg = _resolve(rh_fg_spec, header_row_idx)
@@ -271,7 +303,7 @@ class FlextabResult(pd.DataFrame):
                             css_str = _css(hdr_bg, hdr_fg)
                         if css_str:
                             line = _re.sub(
-                                r'<th\b[^>]*>.*?</th>',
+                                r"<th\b[^>]*>.*?</th>",
                                 lambda m, _c=css_str: _style_one_th(m, _c),
                                 line,
                             )
@@ -286,7 +318,7 @@ class FlextabResult(pd.DataFrame):
                         row_css = _css(rb, rf)
                         if row_css:
                             line = _re.sub(
-                                r'<th\b([^>]*?)>',
+                                r"<th\b([^>]*?)>",
                                 lambda m, css=row_css: f'<th{m.group(1)} style="{css}">',
                                 line,
                             )
@@ -298,7 +330,7 @@ class FlextabResult(pd.DataFrame):
                         cell_css = _css(cb, cf)
                         if cell_css:
                             line = _re.sub(
-                                r'<td\b([^>]*?)>',
+                                r"<td\b([^>]*?)>",
                                 lambda m, css=cell_css: f'<td{m.group(1)} style="{css}">',
                                 line,
                             )
@@ -358,17 +390,19 @@ class FlextabResult(pd.DataFrame):
         call ExcelWriter.close() / use it as a context manager to save.
         """
         import io
+
         try:
             from openpyxl import load_workbook
             from openpyxl.styles import Font
             from openpyxl.styles import PatternFill
+
             HAS_OPENPYXL = True
         except ImportError:
             HAS_OPENPYXL = False
 
         col_fmt_map = self.attrs.get("col_fmt_map", {})
         row_fmt_map = self.attrs.get("row_fmt_map", {})
-        style       = self.attrs.get("style", {})
+        style = self.attrs.get("style", {})
 
         is_path = isinstance(excel_writer, (str, __import__("pathlib").Path))
 
@@ -398,9 +432,9 @@ class FlextabResult(pd.DataFrame):
         # name set (e.g. row_header="Origin and type").  Detect this extra row
         # by comparing the actual sheet row count to what we'd expect without it.
         n_col_header_rows = self.columns.nlevels
-        n_row_index_cols  = self.index.nlevels
-        n_data_rows       = len(self)
-        n_data_cols       = len(self.columns)
+        n_row_index_cols = self.index.nlevels
+        n_data_rows = len(self)
+        n_data_cols = len(self.columns)
 
         expected_rows_no_name = n_col_header_rows + n_data_rows
         actual_rows = ws.max_row
@@ -411,8 +445,9 @@ class FlextabResult(pd.DataFrame):
         def _fill(hex_color):
             if not hex_color:
                 return None
-            return PatternFill(start_color=hex_color, end_color=hex_color,
-                               fill_type="solid")
+            return PatternFill(
+                start_color=hex_color, end_color=hex_color, fill_type="solid"
+            )
 
         def _font(hex_color):
             if not hex_color:
@@ -427,12 +462,12 @@ class FlextabResult(pd.DataFrame):
 
         header_bg_spec = style.get("header_bg")
         header_fg_spec = style.get("header_fg")
-        row_bg_spec    = style.get("row_bg")
-        row_fg_spec    = style.get("row_fg")
-        rh_bg_spec     = style.get("row_header_bg")
-        rh_fg_spec     = style.get("row_header_fg")
-        cell_bg_spec   = style.get("cell_bg")
-        cell_fg_spec   = style.get("cell_fg")
+        row_bg_spec = style.get("row_bg")
+        row_fg_spec = style.get("row_fg")
+        rh_bg_spec = style.get("row_header_bg")
+        rh_fg_spec = style.get("row_header_fg")
+        cell_bg_spec = style.get("cell_bg")
+        cell_fg_spec = style.get("cell_fg")
 
         def _resolve_hex(spec, idx):
             """Resolve a style spec (single colour or cycling 2-tuple) to hex for row idx."""
@@ -445,8 +480,11 @@ class FlextabResult(pd.DataFrame):
         # cells are excluded from the header_bg/fg loop below and coloured
         # separately by row_header_bg/fg, so header_bg never bleeds into
         # them when row_header_bg is left unset.
-        has_row_header = bool(self.index.names[0]) if isinstance(self.index, pd.MultiIndex) \
+        has_row_header = (
+            bool(self.index.names[0])
+            if isinstance(self.index, pd.MultiIndex)
             else bool(self.index.name)
+        )
         row_header_row = (first_data_row - 1) if has_row_header else None
 
         # ── Header rows (column headers, excluding the row_header cells) ───
@@ -472,8 +510,8 @@ class FlextabResult(pd.DataFrame):
             xl_row = first_data_row + data_row_idx
             cur_cell_bg = _resolve_hex(cell_bg_spec, data_row_idx)
             cur_cell_fg = _resolve_hex(cell_fg_spec, data_row_idx)
-            cur_row_bg  = _resolve_hex(row_bg_spec, data_row_idx)
-            cur_row_fg  = _resolve_hex(row_fg_spec, data_row_idx)
+            cur_row_bg = _resolve_hex(row_bg_spec, data_row_idx)
+            cur_row_fg = _resolve_hex(row_fg_spec, data_row_idx)
 
             for c in range(1, n_row_index_cols + n_data_cols + 1):
                 cell = ws.cell(xl_row, c)
@@ -508,4 +546,3 @@ class FlextabResult(pd.DataFrame):
         # ── Save ─────────────────────────────────────────────────────────
         if buf is not None:
             wb.save(excel_writer)
-

@@ -96,21 +96,6 @@ def test_expand_with_branch_numbers_top_level_concat():
 
     assert [branch for branch, _ in expanded] == [0, 1]
 
-def test_expand_cross_combines_paths():
-    row, _ = parse_table("sex*region")
-
-    paths = _expand_node(row)
-
-    assert len(paths) == 1
-    assert [node.name for node in paths[0]] == ["sex", "region"]
-
-def test_expand_with_branch_numbers_top_level_concat():
-    row, _ = parse_table("sex region")
-
-    expanded = _expand_node_with_branch(row)
-
-    assert [branch for branch, _ in expanded] == [0, 1]
-
 def test_expand_with_branch_cross_uses_single_branch():
     row, _ = parse_table("sex*region")
 

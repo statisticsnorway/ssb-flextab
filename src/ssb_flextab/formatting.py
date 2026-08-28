@@ -32,7 +32,7 @@ def _parse_fmt_spec(spec: str):
     The W and sep together determine the output style — W itself is not
     used for padding since flextab() returns string-valued cells.
 
-    Examples:
+    Examples
     --------
       "7.1"   -> 1 decimal, point:              1 234.6
       "7,2"   -> 2 decimals, comma:             1 234,56
@@ -41,7 +41,7 @@ def _parse_fmt_spec(spec: str):
       "9.0s"  -> 0 decimals, space thousands:   1 235
       "7,2s"  -> 2 decimals, comma + space:     1 234,56
 
-    Returns:
+    Returns
     -------
     Callable (value: Any) -> str
         A formatting function.  Non-numeric values are returned as str(value).
@@ -140,19 +140,19 @@ def flextab_to_string(
     na_rep : str, default "."
         Text shown in place of NaN / missing cells.
 
-    Returns:
+    Returns
     -------
     str
         A fixed-width string suitable for printing.
 
-    Notes:
+    Notes
     -----
     Per-cell format= specs from the TABLE expression (e.g. *format=7,1
     or *format=12.0s) take precedence over the fmt parameter for their
     specific cells.  The fmt parameter acts as the default for any cell
     without an explicit format= spec.
 
-    Examples:
+    Examples
     --------
     print(flextab_to_string(r))                   # default fmt
     print(flextab_to_string(r, fmt="{:.0f}"))     # 0 decimals everywhere
@@ -209,12 +209,12 @@ def flextab_to_markdown(
         Separator used to join a MultiIndex column's levels into one
         header label.
 
-    Returns:
+    Returns
     -------
     str
         A GitHub-flavoured Markdown table.
 
-    Examples:
+    Examples
     --------
     print(flextab_to_markdown(r))
     with open("table.md", "w") as f:

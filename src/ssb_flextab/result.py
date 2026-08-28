@@ -401,7 +401,7 @@ class FlextabResult(pd.DataFrame):
         Every key accepts a single colour (applied to every row) or a
         (colour0, colour1) 2-tuple that cycles through rows.
 
-        Notes:
+        Notes
         -----
         If excel_writer is a file path (str or Path), the file is written
         and post-processed in one step. If it is an open ExcelWriter, the

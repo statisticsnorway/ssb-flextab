@@ -75,7 +75,7 @@ def _tokenize(expr: str) -> list[tuple]:
 class DimNode:
     """A node in the parsed TABLE expression tree.
 
-    Attributes:
+    Attributes
     ----------
     kind : str
         One of:

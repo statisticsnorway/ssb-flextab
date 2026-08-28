@@ -213,170 +213,232 @@ def flextab(
     weight: str | None = None,
     row_header: str | None = None,
     style: dict | None = None,
-) -> pd.DataFrame:
-    """Build a cross-tabulation table, equivalent to SAS PROC TABULATE.
+) -> FlextabResult:
+    """Build a cross-tabulation table similar to SAS PROC TABULATE.
 
-    Returns a FlextabResult — a pd.DataFrame subclass that keeps the
-    underlying values numeric (for further computation or export) but
-    applies format= specs from the TABLE expression when displayed.
+    Returns a ``FlextabResult``, a ``pd.DataFrame`` subclass that keeps the
+    underlying values numeric for further computation or export, while
+    applying ``format=`` specifications from the TABLE expression when
+    displayed.
 
     Parameters
     ----------
     data : pd.DataFrame
         Input data.
 
-    measure : str or list of str, optional
-        Numeric analysis variable name(s) (SAS: VAR). A single column can be
-        passed as a plain string, e.g. measure="income" instead of
-        measure=["income"]. Omit for count-only tables that use N, COUNT,
-        SIZE or percent statistics.
+    measure : str | list | None, default None
+        Numeric analysis variable name or names (SAS: VAR). A single column
+        can be passed as a plain string, for example ``measure="income"``
+        instead of ``measure=["income"]``.
 
-    groupby : str or list of str, optional
-        Categorical grouping variable name(s) (SAS: CLASS). A single column
-        can be passed as a plain string, e.g. groupby="origin" instead of
-        groupby=["origin"].
+        Omit this argument for count-only tables that use ``N``, ``COUNT``,
+        ``SIZE``, or percentage statistics that do not require a measure.
 
-    table : str, optional
-        TABLE expression.  Syntax summary:
+    groupby : str | list | None, default None
+        Categorical grouping variable name or names (SAS: CLASS). A single
+        column can be passed as a plain string, for example
+        ``groupby="origin"`` instead of ``groupby=["origin"]``.
 
-          row_expr , col_expr      comma separates row and column dimensions
-          A * B                   cross/nest: A values crossed with B values
-          A B                     concatenation: A then B (space-separated)
-          ( A B )                 group: treat as one unit for * and format=
-          ALL  or  TOTAL          marginal total (synonymous keywords)
-          name='Label'            rename any token; name='' suppresses it
+    table : str | None, default None
+        TABLE expression describing the row and column dimensions.
 
-        Format specifications (attach to any preceding token or group):
-          *format=W.D             D decimals, decimal point
-          *format=W,D             D decimals, decimal comma (European)
-          *format=W.D_            decimal point + comma thousands separator
-          *format=W,D_            decimal comma + dot thousands separator
-          *format=W.Ds            decimal point + space thousands separator
-          *format=W,Ds            decimal comma + space thousands separator
+        Basic syntax:
 
-          Apply one format to several stats at once:
+        - ``row_expr , col_expr`` separates row and column dimensions.
+        - ``A * B`` crosses or nests A with B.
+        - ``A B`` concatenates A and B in written order.
+        - ``(A B)`` groups an expression so it is treated as one unit.
+        - ``ALL`` or ``TOTAL`` adds a marginal total.
+        - ``name='Label'`` renames a token.
+        - ``name=''`` suppresses the corresponding label level.
+
+        Format specifications may be attached to a preceding token or group:
+
+        - ``*format=W.D``: D decimals, decimal point.
+        - ``*format=W,D``: D decimals, decimal comma.
+        - ``*format=W.D_``: decimal point and comma thousands separator.
+        - ``*format=W,D_``: decimal comma and dot thousands separator.
+        - ``*format=W.Ds``: decimal point and space thousands separator.
+        - ``*format=W,Ds``: decimal comma and space thousands separator.
+
+        A format can be applied to several statistics at once, for example::
+
             (mean gmean)*format=7,1*income
 
-        Custom denominator definitions (after PCTN or PCTSUM):
-          PCTN<denom>  or  PCTSUM<denom>
-          where <denom> is a space-separated list of:
-            measure_col  -> denominator = sum of that measure in same group
-            groupby_col  -> denominator = subtotal within all values of
-                            that class variable
-            ALL or TOTAL -> grand total
-          Multiple tokens: first one that applies to the subtable is used.
+        Custom denominator definitions are supported for ``PCTN`` and
+        ``PCTSUM`` using::
 
-    Examples:
-            tax*pctsum<income>           tax as % of income
-            income*pctsum<gender all>    % of gender subtotal; ALL fallback
-            pctn<origin all>             count % of origin subtotal
+            PCTN<denom>
+            PCTSUM<denom>
+
+        The denominator definition is a space-separated list containing one
+        or more of:
+
+        - A measure column, meaning that measure is used as the denominator
+          within the same grouping.
+        - A groupby column, meaning the denominator is the subtotal obtained
+          by collapsing that class variable.
+        - ``ALL`` or ``TOTAL``, meaning the grand total.
+
+        When several denominator tokens are supplied, the token matching the
+        current subtable is preferred, with later tokens available as
+        fallbacks.
+
+        Examples include::
+
+            tax*pctsum<income>
+
+        which expresses tax as a percentage of income, and::
+
+            income*pctsum<gender all>
+
+        which uses a gender subtotal where applicable and ``ALL`` as a
+        fallback.
 
     include_missing_in_groupby : bool, default True
-        When True, NaN values in groupby columns appear as their own group
-        level. When False, rows with missing groupby values are excluded.
+        Whether missing values in groupby columns should appear as their own
+        group level.
+
+        If True, missing values are retained as grouping levels. If False,
+        rows with missing values in grouping columns are excluded from the
+        corresponding grouping operation.
 
     fmt : str, default "{:.1f}"
-        Default Python format string for numeric cells that have no
-        per-column format= spec in the TABLE expression.  Used by print(),
-        repr(), and flextab_to_string() unless overridden there.
+        Default Python format string for numeric cells that do not have an
+        explicit ``format=`` specification in the TABLE expression.
 
-    na_rep : str, optional
-        Text shown in place of NaN / missing cells (e.g. na_rep='-' or
-        na_rep='.'). When None (default), NaN cells remain as NaN floats,
-        which is best for further numeric operations.
+        This format is used by ``print()``, ``repr()``, and
+        ``flextab_to_string()`` unless overridden there.
 
-    labels : dict of dict, optional
-        Remap groupby values to display labels. Outer key = column name,
-        inner dict maps original values to display labels.  Groupby
-        aggregation always uses the original codes; remapping is applied
-        only for display.
-        Example: {'gender': {1: 'Male', 2: 'Female'},
-                  'region': {'N': 'North', 'S': 'South'}}
+    na_rep : str | None, default None
+        Text shown in place of NaN or missing cells, for example ``"-"`` or
+        ``"."``.
 
-    sort_by : {'code', 'index', 'label'}, default 'code'
-        Controls the order of groupby levels:
-          'code'   sort by original data values (before label remapping)
-          'index'  sort by position in the labels dict (dict insertion
-                   order) — use when the dict defines the desired order
-          'label'  sort alphabetically by the display label text
-        'index' and 'label' only affect columns that appear in labels=;
-        columns without a label dict always sort by 'code'.
+        If None, missing cells remain as numeric NaN values. This is normally
+        preferable when the returned table will be used for further numeric
+        operations.
 
-    weight : str, optional
-        Name of a numeric column to use as a frequency weight
-        (SAS: WEIGHT statement).  Rules:
-          weight = 0       counted in N; contributes 0 to weighted sums
-          weight < 0       treated as 0 (still counted in N)
-          weight = missing row excluded entirely
-        Weighted formulas used:
-          SUM    sum(w * x)
-          MEAN   sum(w*x) / sum(w)
-          VAR    reliability-weights unbiased: sum(w)/(sum(w)^2-sum(w^2))
-                 * sum(w*(x-xbar)^2)  [reduces to n-1 when all w_i = 1]
-          STD    sqrt(VAR)
-          STDERR sqrt(VAR / sum(w))
-          GMEAN  exp(sum(w*log(x)) / sum(w))
-          HMEAN  sum(w) / sum(w/x)
-          Percentiles: weighted empirical CDF
-        N, COUNT, SIZE and NMISS are NEVER weighted.
+    labels : dict | None, default None
+        Mapping from original groupby values to display labels.
 
-    row_header : str, optional
-        Name to assign to the row index.  Equivalent to setting
-        result.index.name (flat index) or result.index.names[0]
-        (MultiIndex) after the call.
-        Example: row_header='Region' labels the leftmost index column.
+        The outer dictionary key is the groupby column name. The inner
+        dictionary maps original values to display labels. Aggregation and
+        sorting by code use the original values; remapping is applied only
+        for display.
 
-    style : dict, optional
-        Colour styling for display and Excel export.  Omit any key to leave
-        that area unstyled.  Colours may be specified as:
-          - Named string:   'blue', 'red', 'lightgrey', 'navy', …
-          - Hex string:     '#4472C4'  or  '4472C4'
-          - RGB tuple:      (70, 114, 196)
+        Example::
 
-        Every key below uses the SAME technique: the value is either a
-        single colour (applied to every row) or a 2-tuple (colour0,
-        colour1) that CYCLES through all rows: row 0 → colour0, row 1 →
-        colour1, row 2 → colour0, and so on.
+            {
+                "gender": {1: "Male", 2: "Female"},
+                "region": {"N": "North", "S": "South"},
+            }
 
-        Keys:
-          'header_bg'      background colour for the column header cells
-          'header_fg'      foreground (text) colour for column header cells
-          'row_bg'         background colour for the row index cells
-                           (the groupby label/value cells on the left)
-          'row_fg'         foreground colour for the row index cells
-          'row_header_bg'  background colour for the row header cell — the
-                           corner cell showing the text passed via the
-                           row_header= argument to flextab()
-          'row_header_fg'  foreground colour for the row header cell
-          'cell_bg'        background colour for the table's data cells
-          'cell_fg'        foreground colour for the table's data cells
+    sort_by : str, default "code"
+        Controls the order of groupby levels.
 
-        The styling is applied in three places:
-          1. Jupyter HTML display (_repr_html_): inline CSS on <tr>/<th>
-          2. print() / repr(): terminal output is uncoloured (plain text)
-          3. result.to_excel('file.xlsx'): openpyxl PatternFill + Font
+        Supported values are:
+
+        - ``"code"``: sort by original data values before label remapping.
+        - ``"index"``: sort according to insertion order in the corresponding
+          ``labels`` dictionary.
+        - ``"label"``: sort alphabetically by the display-label text.
+
+        ``"index"`` and ``"label"`` affect only columns that have a mapping in
+        ``labels``. Columns without a label dictionary are sorted by their
+        original values.
+
+    weight : str | None, default None
+        Name of a numeric column used as a weight (SAS: WEIGHT statement).
+
+        Weight handling follows these rules:
+
+        - A weight of zero remains part of unweighted counts but contributes
+          zero to weighted statistics.
+        - A negative weight is treated as zero and remains part of unweighted
+          counts.
+        - A missing weight excludes the observation entirely.
+
+        Weighted statistics use the following definitions:
+
+        - ``SUM``: ``sum(w * x)``.
+        - ``MEAN``: ``sum(w * x) / sum(w)``.
+        - ``VAR``: unbiased reliability-weight variance,
+          ``sum(w) / (sum(w)^2 - sum(w^2)) * sum(w * (x - xbar)^2)``.
+        - ``STD``: square root of weighted variance.
+        - ``STDERR``: ``sqrt(VAR / sum(w))``.
+        - ``GMEAN``: ``exp(sum(w * log(x)) / sum(w))``.
+        - ``HMEAN``: ``sum(w) / sum(w / x)``.
+        - Percentiles: weighted empirical cumulative distribution.
+
+        ``N``, ``COUNT``, ``SIZE``, and ``NMISS`` are never weighted.
+
+    row_header : str | None, default None
+        Name assigned to the row index.
+
+        For a flat index, this corresponds to ``result.index.name``. For a
+        MultiIndex, it is assigned to the first index level.
+
+        Example::
+
+            row_header="Region"
+
+        labels the leftmost index column as ``Region``.
+
+    style : dict | None, default None
+        Colour styling applied to notebook display and Excel export.
+
+        Colours may be specified as:
+
+        - Named strings such as ``"blue"``, ``"red"``, ``"lightgrey"``, or
+          ``"navy"``.
+        - Hexadecimal strings such as ``"#4472C4"`` or ``"4472C4"``.
+        - RGB tuples such as ``(70, 114, 196)``.
+
+        Each style key may contain either one colour, which is applied
+        uniformly, or a two-element sequence of colours that alternates
+        between rows.
+
+        Supported keys are:
+
+        - ``header_bg``: column-header background colour.
+        - ``header_fg``: column-header foreground colour.
+        - ``row_bg``: row-index background colour.
+        - ``row_fg``: row-index foreground colour.
+        - ``row_header_bg``: background colour of the row-header corner cell.
+        - ``row_header_fg``: foreground colour of the row-header corner cell.
+        - ``cell_bg``: data-cell background colour.
+        - ``cell_fg``: data-cell foreground colour.
+
+        Styling is applied in three contexts:
+
+        1. Jupyter HTML display via ``_repr_html_()``.
+        2. Plain ``print()`` and ``repr()`` output, which remains uncoloured.
+        3. Excel export through ``result.to_excel()``, using openpyxl styling.
 
         Example::
 
             style={
-                'header_bg': '#4472C4', 'header_fg': 'white',
-                'row_bg':    'lightgrey', 'row_fg': 'black',
-                'row_header_bg': '#4472C4', 'row_header_fg': 'white',
-                'cell_bg': ('white', '#EBF3FB'),  # row0=white, row1=pale blue
+                "header_bg": "#4472C4",
+                "header_fg": "white",
+                "row_bg": "lightgrey",
+                "row_fg": "black",
+                "row_header_bg": "#4472C4",
+                "row_header_fg": "white",
+                "cell_bg": ("white", "#EBF3FB"),
             }
 
-    Returns:
+    Returns
     -------
     FlextabResult
-        A pd.DataFrame subclass.  Numeric values are preserved for
-        computation (.sum(), arithmetic, etc.).  format= specs from the
-        TABLE expression are applied automatically by print(), repr(),
-        and Jupyter cell display.
+        A ``pd.DataFrame`` subclass containing the numeric table values.
 
-        Call result.to_excel(path) to export with full number formatting
-        and colour styling preserved via openpyxl post-processing.
-        Use flextab_to_string(result, fmt, na_rep) for explicit string
-        rendering control.
+        Numeric values are preserved for operations such as ``sum`` and
+        arithmetic. ``format=`` specifications from the TABLE expression are
+        applied automatically by ``print()``, ``repr()``, and Jupyter display.
+
+        Use ``result.to_excel(path)`` to export the table with number
+        formatting and colour styling. Use ``flextab_to_string()`` or
+        ``flextab_to_markdown()`` for explicit textual rendering.
     """
     # Allow passing a single column name as a plain string instead of a
     # one-element list, e.g. measure="income" instead of measure=["income"].
@@ -777,39 +839,70 @@ def flextab(
         keys: list[tuple[Any, Any]],
         hdr_path: dict[Any, tuple[list[Any], int]],
     ) -> pd.Index:
-        """Convert (hdr, data_key) pairs to a MultiIndex using slot-based layout.
+        """Convert header/data-key pairs to an index using slot-based layout.
 
-        Every spec in the dimension produces a fixed-length tuple of the same
-        depth D = sum(slots), where the slot layout is computed globally so
-        that all specs align correctly:
-          - groupby variables occupy 2 slots (label row + value row)
-          - stat / var / ALL tokens occupy 1 slot each
-          - shorter specs are bottom-aligned (front-padded with blanks) so
-            their innermost token always lands at the same absolute level as
-            the innermost token of deeper specs
+        Every specification in the dimension produces a fixed-length tuple of the
+        same depth, ``D = sum(slots)``, where the slot layout is computed globally
+        so that all specifications align correctly:
 
-        After building the tuples, any level that is blank across ALL columns
-        is dropped — these are structural artefacts (e.g. the label slot of a
-        group whose label was suppressed with ='') that carry no information.
+        - Groupby variables occupy two slots: one label row and one value row.
+        - Statistic, measure, and ALL/TOTAL tokens occupy one slot each.
+        - Shorter specifications are bottom-aligned and front-padded with blanks
+        so their innermost token lands at the same absolute level as the
+        innermost token of deeper specifications.
 
-        Examples:
+        After building the tuples, any level that is blank across all columns is
+        dropped. These blank levels are structural artefacts, for example the
+        label slot of a group whose label was suppressed with ``=''``.
+
+        Parameters
+        ----------
+        keys : list[tuple[Any, Any]]
+            Sequence of ``(header, data_key)`` pairs to convert to index labels.
+        hdr_path : dict[Any, tuple[list[Any], int]]
+            Mapping from each header to its path-order metadata and top-level
+            branch index.
+
+        Returns
+        -------
+        pd.Index
+            An Index or MultiIndex containing the aligned display labels.
+
+        Examples
         --------
-        Expression ``n colpctn*(all age_group)`` produces specs:
-          [stat:N]                         → ('N',)        1 position
-          [stat:COLPCTN, all:TOTAL]        → ('COLPCTN','TOTAL')
-          [stat:COLPCTN, group:age_group]  → ('COLPCTN','age_group','10-19')
+        The expression ``n colpctn*(all age_group)`` produces specifications such
+        as::
 
-        Slot layout: pos0=stat(1 slot), pos1=group/all(2 slots because age_group
-        has a non-blank label) → D=3.  After bottom-alignment and blank-dropping:
-          N          → ('',       'N')      ← blank level 0 dropped, level 2 dropped
-          COLPCTN/TOTAL → ('COLPCTN','TOTAL','')
-          COLPCTN/age=10-19 → ('COLPCTN','age_group','10-19')
+            [stat:N]
+            [stat:COLPCTN, all:TOTAL]
+            [stat:COLPCTN, group:age_group]
 
-        Expression ``origin * (type total='Subtotal')`` produces specs:
-          [group:origin, group:type]   → ('origin','Asia','type','SUV')
-          [group:origin, all:Subtotal] → ('origin','Asia','Subtotal','')
-        Both have D=4; the Subtotal row's trailing '' is kept so 'Asia' aligns
-        vertically with 'Asia' in the detail rows (2-slot group positions).
+        Their logical labels are::
+
+            ('N',)
+            ('COLPCTN', 'TOTAL')
+            ('COLPCTN', 'age_group', '10-19')
+
+        The slot layout has one slot for the statistic position and two slots for
+        the group/ALL position because ``age_group`` has a non-blank label. This
+        gives ``D = 3``.
+
+        After bottom alignment and removal of levels that are blank everywhere,
+        the entries align so that totals and group values occupy the same logical
+        positions.
+
+        The expression ``origin * (type total='Subtotal')`` similarly produces::
+
+            [group:origin, group:type]
+            [group:origin, all:Subtotal]
+
+        which can be represented as::
+
+            ('origin', 'Asia', 'type', 'SUV')
+            ('origin', 'Asia', 'Subtotal', '')
+
+        Both have the same slot depth, so ``'Asia'`` remains vertically aligned
+        between detail and subtotal rows.
         """
         all_po = [hdr_path.get(hdr, ([], 0))[0] for hdr, _ in keys]
         slots = _compute_slot_layout(all_po)

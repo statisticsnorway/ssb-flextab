@@ -272,39 +272,57 @@ def _compute_series(
     missing: bool,
     weight: str | None = None,
 ) -> pd.Series:
-    """Compute an aggregated Series for a single (row_spec, col_spec) pair.
+    """Compute an aggregated Series for one row/column specification pair.
 
-    When neither spec carries an ALL/TOTAL token — i.e. both dimensions
-    are pure groupby-value breakdowns with no marginal totals.
+    This function handles cases where neither specification contains an
+    ALL/TOTAL token. Both dimensions therefore represent ordinary groupby
+    breakdowns rather than marginal totals.
 
     Parameters
     ----------
-    data       : filtered/cleaned DataFrame (weight rows already dropped)
-    all_groups : combined list of r_groups + c_groups (the groupby keys)
-    var        : measure column name, or None for count-only stats
-    stat       : statistic keyword (e.g. 'MEAN', 'COLPCTN', 'N')
-    r_groups   : groupby columns in the row dimension
-    c_groups   : groupby columns in the column dimension
-    missing    : passed as dropna=not-missing to groupby
-    weight     : optional weight column name
+    data : pd.DataFrame
+        Filtered input data used for the aggregation.
+    all_groups : list[str]
+        Combined row and column grouping columns.
+    var : str | None
+        Measure column name, or None for count-only statistics.
+    stat : str
+        Statistic keyword, for example ``"MEAN"``, ``"COLPCTN"``, or ``"N"``.
+    r_groups : list[str]
+        Grouping columns in the row dimension.
+    c_groups : list[str]
+        Grouping columns in the column dimension.
+    missing : bool
+        Whether missing group values should be included.
+    weight : str | None, default None
+        Optional weight column name.
 
-    Returns:
+    Returns
     -------
-    pd.Series  indexed by the all_groups groupby key(s)
+    pd.Series
+        Aggregated values indexed by the grouping columns in ``all_groups``.
 
-    Notes:
+    Raises
+    ------
+    ValueError
+        If the requested statistic requires a measure variable but ``var``
+        is None.
+
+    Notes
     -----
-    Percentage stats (PCTN, PCTSUM, ROWPCTN, COLPCTN, ROWPCTSUM,
-    COLPCTSUM) route through this function. Their denominator is
-    determined by the stat name:
-      PCTN/PCTSUM       -> grand total (all rows)
-      ROWPCTN/ROWPCTSUM -> row subtotal (grouped by r_groups)
-      COLPCTN/COLPCTSUM -> column subtotal (grouped by c_groups)
+    Percentage statistics such as ``PCTN``, ``PCTSUM``, ``ROWPCTN``,
+    ``COLPCTN``, ``ROWPCTSUM``, and ``COLPCTSUM`` are routed through this
+    function. Their denominators depend on the statistic:
 
-    Custom denominators (PCTN<...>, PCTSUM<...>) are NOT routed here —
-    they go directly to _compute_custom_pct() from the main dispatch loop.
+    - ``PCTN`` and ``PCTSUM`` use the grand total.
+    - ``ROWPCTN`` and ``ROWPCTSUM`` use row subtotals.
+    - ``COLPCTN`` and ``COLPCTSUM`` use column subtotals.
 
-    N, COUNT, SIZE and NMISS are never weighted even when weight= is given.
+    Custom denominators such as ``PCTN<...>`` and ``PCTSUM<...>`` are handled
+    separately by ``_compute_custom_pct``.
+
+    ``N``, ``COUNT``, ``SIZE``, and ``NMISS`` are never weighted, even when
+    ``weight`` is provided.
     """
     dropna = not missing
 
@@ -460,7 +478,7 @@ def _compute_all_series(
     c_groups       : col-dimension groupby columns (for ROWPCTN denominator)
     weight         : optional weight column name
 
-    Notes:
+    Notes
     -----
     For COLPCTN/COLPCTSUM: denominator = column total (grouped by c_groups).
     For ROWPCTN/ROWPCTSUM: denominator = row total   (grouped by r_groups).
@@ -608,25 +626,36 @@ def _compute_all_series(
 
 
 def _parse_denom_def(denom_str: str) -> list[str]:
-    """Parse the content of a <...> denominator definition.
-
-    Into an ordered list of uppercase token strings.
+    """Parse a denominator definition into ordered uppercase tokens.
 
     Each token is one of:
-      - An uppercase measure variable name (e.g. 'INCOME')
-      - An uppercase class variable name   (e.g. 'GENDER')
-      - 'ALL' or 'TOTAL'                   (grand-total fallback)
 
-    Multiple tokens are tried in left-to-right order by _compute_custom_pct;
-    the first token that "matches" the current subtable is used as the
-    denominator.  Placing ALL/TOTAL last provides a fallback for cells where
+    - An uppercase measure variable name, for example ``"INCOME"``.
+    - An uppercase class variable name, for example ``"GENDER"``.
+    - ``"ALL"`` or ``"TOTAL"`` as a grand-total fallback.
+
+    Multiple tokens are tried from left to right by ``_compute_custom_pct``.
+    The first token that matches the current subtable is used as the
+    denominator. Placing ``ALL`` or ``TOTAL`` last provides a fallback when
     none of the named variables participate.
 
-    Examples:
+    Parameters
+    ----------
+    denom_str : str
+        Content of the ``<...>`` denominator definition.
+
+    Returns
+    -------
+    list[str]
+        Ordered uppercase denominator tokens.
+
+    Examples
     --------
-    'income'       -> ['INCOME']
-    'gender all'   -> ['GENDER', 'ALL']
-    'origin total' -> ['ORIGIN', 'TOTAL']
+    ``"income"`` becomes ``["INCOME"]``.
+
+    ``"gender all"`` becomes ``["GENDER", "ALL"]``.
+
+    ``"origin total"`` becomes ``["ORIGIN", "TOTAL"]``.
     """
     return [t.upper() for t in denom_str.strip().split()]
 
@@ -647,41 +676,71 @@ def _compute_custom_pct(
 ) -> pd.Series:
     """Compute a percentage statistic with a user-defined denominator.
 
-    This implements the PCTN<...> and PCTSUM<...> syntax, where the content
-    of <...> specifies what the denominator should be.
+    This implements the ``PCTN<...>`` and ``PCTSUM<...>`` syntax, where the
+    content of ``<...>`` specifies what the denominator should be.
 
-    Denominator token resolution — PER ROW
-    ---------------------------------------
-    SAS picks the denominator token that matches the **innermost breakdown
-    variable** of the current spec, not just the first globally-applicable
-    token.  This is derived from the innermost 'group' or 'all' entry in
-    r_path_order / c_path_order:
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Input data used to compute the numerator and denominator.
+    r_groups : list
+        Grouping columns in the row dimension.
+    c_groups : list
+        Grouping columns in the column dimension.
+    var : str
+        Measure column used for the numerator.
+    stat : str
+        Percentage statistic to compute.
+    denom_def : str
+        Denominator definition from the ``<...>`` expression.
+    groupby : list
+        Available grouping variables.
+    measure : list
+        Available measure variables.
+    missing : bool
+        Whether missing grouping values should be included.
+    weight : str | None, default None
+        Optional weight column.
+    r_path_order : list | None, default None
+        Parsed row path used to determine the innermost breakdown variable.
+    c_path_order : list | None, default None
+        Parsed column path used to determine the innermost breakdown variable.
 
-      - If the innermost entry is 'all' (a Total/ALL row):
-            use the first token in denom_def that is 'ALL'/'TOTAL', or the
-            first class variable that is NOT in the current all_groups (so
-            it acts as the parent subtotal level).
+    Returns
+    -------
+    pd.Series
+        Computed percentage values indexed by the relevant grouping keys.
 
-      - If the innermost entry is 'group' with orig_col X:
-            find the token in denom_def that matches X (case-insensitive).
-            The denominator is then the subtotal obtained by collapsing X
-            from all_groups — i.e. groupby(all_groups minus X).
+    Notes
+    -----
+    Denominator resolution is performed per row.
 
-      - Measure variable names in denom_def always use the same groups as
-        the numerator (ratio of two measures within the same breakdown).
+    If the innermost entry is ``"all"``, the first ``"ALL"`` or ``"TOTAL"``
+    token is preferred. A class variable that is not in the current grouping
+    may instead act as a parent subtotal level.
 
-      - If no matching token is found, fall back left-to-right through the
-        token list as before, or to grand total as a final fallback.
+    If the innermost entry is a group with original column ``X``, the token
+    matching ``X`` is preferred. The denominator is then obtained by
+    collapsing ``X`` from the current grouping.
 
-    Examples:
+    Measure-variable tokens use the same groups as the numerator.
+
+    If no preferred token matches, the tokens are tried from left to right,
+    with the grand total as the final fallback.
+
+    Examples
     --------
-    pctn<total gender age_group>  with row spec origin*(Total gender age_group):
-      Total row  -> innermost=all  -> token 'total' -> grand total denom
-      gender row -> innermost=gender -> token 'gender' -> origin subtotal denom
-      age_group row -> innermost=age_group -> token 'age_group' -> origin subtotal
+    ``pctn<total gender age_group>`` with row specification
+    ``origin*(Total gender age_group)`` gives:
 
-    pctsum<income>  (ratio of two measures, same groups always)
-    pctn<gender all>  (gender subtotal, fallback to grand total)
+    - Total row: grand-total denominator.
+    - Gender row: origin subtotal denominator.
+    - Age-group row: origin subtotal denominator.
+
+    ``pctsum<income>`` uses the same grouping for numerator and denominator.
+
+    ``pctn<gender all>`` uses the gender subtotal and falls back to the
+    grand total.
     """
     measure_upper = [m.upper() for m in (measure or [])]
     groupby_upper = [g.upper() for g in (groupby or [])]

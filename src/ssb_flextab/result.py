@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+from openpyxl.styles.fills import PatternFill
+from openpyxl.cell.cell import Cell
+
+from collections.abc import Callable
 from typing import Any
 from typing import ClassVar
+
+import re
+
+from pathlib import Path
 
 import pandas as pd
 
@@ -41,7 +49,7 @@ class FlextabResult(pd.DataFrame):
     # ── Internal colour helpers ────────────────────────────────────────────
 
     @staticmethod
-    def _to_hex(color) -> str:
+    def _to_hex(color: Any) -> str | None:
         """Normalise a colour specification to a 6-character uppercase hex string.
 
         (no '#' prefix) suitable for openpyxl and CSS.
@@ -97,7 +105,7 @@ class FlextabResult(pd.DataFrame):
         )
 
     @staticmethod
-    def _resolve_color(spec, idx: int) -> Any | list[Any] | tuple[Any, ...] | None:
+    def _resolve_color(spec: Any, idx: int) -> Any:
         """Resolve a style-dict colour spec for row/band index `idx`.
 
         Every style key (header_bg/fg, row_bg/fg, row_header_bg/fg,
@@ -122,7 +130,7 @@ class FlextabResult(pd.DataFrame):
         return spec
 
     @staticmethod
-    def _fmt_to_excel_numfmt(formatter) -> str:
+    def _fmt_to_excel_numfmt(formatter: Callable[..., Any],) -> str:
         """Convert a _parse_fmt_spec formatter to an Excel number format string.
 
         Inspects the closure variables of the formatter to reliably determine
@@ -217,7 +225,10 @@ class FlextabResult(pd.DataFrame):
             style = self.attrs.get("style", {})
             formatted = _format_dataframe(self, fmt=fmt, na_rep=".")
 
-            def _css(bg=None, fg=None):
+            def _css(
+                bg: Any = None,
+                fg: Any = None,
+                ) -> str:
                 parts = []
                 if bg:
                     hex_bg = FlextabResult._to_hex(bg)
@@ -270,14 +281,18 @@ class FlextabResult(pd.DataFrame):
                 in_thead = False
                 in_thead_row = False
 
-                def _style_one_th(m, css_str):
-                    if not css_str:
-                        return m.group(0)
-                    return _re.sub(
-                        r"<th\b([^>]*)>",
-                        lambda mm: f'<th{mm.group(1)} style="{css_str}">',
-                        m.group(0),
-                    )
+            def _style_one_th(
+                m: re.Match[str],
+                css_str: str | None,
+            ) -> str:
+                if not css_str:
+                    return m.group(0)
+
+                return _re.sub(
+        r"<th\b([^>]*)>",
+        lambda mm: f'<th{mm.group(1)} style="{css_str}">',
+        m.group(0),
+    )
 
                 for line in lines:
                     stripped = line.strip()
@@ -351,7 +366,12 @@ class FlextabResult(pd.DataFrame):
 
     # ── Excel export ──────────────────────────────────────────────────────
 
-    def to_excel(self, excel_writer, sheet_name="Sheet1", **kwargs: Any) -> None:
+    def to_excel(
+        self,
+        excel_writer: str | Path | pd.ExcelWriter,
+        sheet_name: str = "Sheet1",
+        **kwargs: Any,
+    ) -> None:
         """Write to an Excel file with number formatting and colour styling.
 
         Parameters
@@ -404,7 +424,7 @@ class FlextabResult(pd.DataFrame):
         row_fmt_map = self.attrs.get("row_fmt_map", {})
         style = self.attrs.get("style", {})
 
-        is_path = isinstance(excel_writer, (str, __import__("pathlib").Path))
+        is_path = isinstance(excel_writer, (str, Path))
 
         # ── Write the plain DataFrame first ──────────────────────────────
         buf = io.BytesIO() if (HAS_OPENPYXL and is_path) else None
@@ -442,19 +462,17 @@ class FlextabResult(pd.DataFrame):
         index_name_rows = max(0, actual_rows - expected_rows_no_name)
         first_data_row = n_col_header_rows + 1 + index_name_rows
 
-        def _fill(hex_color):
-            if not hex_color:
-                return None
+        def _fill(hex_color: str) -> PatternFill:
             return PatternFill(
-                start_color=hex_color, end_color=hex_color, fill_type="solid"
+                start_color=hex_color,
+                end_color=hex_color,
+                fill_type="solid",
             )
 
-        def _font(hex_color):
-            if not hex_color:
-                return None
+        def _font(hex_color: str) -> Font:
             return Font(color=hex_color)
 
-        def _apply(cell, bg_hex=None, fg_hex=None):
+        def _apply(cell: Cell, bg_hex: str | None = None, fg_hex: str | None = None) -> None:
             if bg_hex:
                 cell.fill = _fill(bg_hex)
             if fg_hex:
@@ -469,8 +487,8 @@ class FlextabResult(pd.DataFrame):
         cell_bg_spec = style.get("cell_bg")
         cell_fg_spec = style.get("cell_fg")
 
-        def _resolve_hex(spec, idx):
-            """Resolve a style spec (single colour or cycling 2-tuple) to hex for row idx."""
+        def _resolve_hex(spec: Any, idx: int) -> str | None:
+            """Resolve a style spec to a hexadecimal colour for row ``idx``."""
             val = FlextabResult._resolve_color(spec, idx)
             return FlextabResult._to_hex(val) if val is not None else None
 

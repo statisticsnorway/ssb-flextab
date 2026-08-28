@@ -1,9 +1,12 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+from typing import Any
+
 if TYPE_CHECKING:
     from .result import FlextabResult
 
-import pandas as pd
 import re
+
+import pandas as pd
 
 
 def _parse_fmt_spec(spec: str):

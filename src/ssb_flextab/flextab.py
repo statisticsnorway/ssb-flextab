@@ -7,8 +7,8 @@ import pandas as pd
 
 from .formatting import _parse_fmt_spec
 from .formatting import flextab_to_string
-from .parser import _classify_path
 from .parser import DimNode
+from .parser import _classify_path
 from .parser import _expand_node_with_branch
 from .parser import parse_table
 from .result import FlextabResult

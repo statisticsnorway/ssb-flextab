@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from openpyxl.styles.fills import PatternFill
-from openpyxl.cell.cell import Cell
-
+import re
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from typing import ClassVar
 
-import re
-
-from pathlib import Path
-
 import pandas as pd
+from openpyxl.cell.cell import Cell
+from openpyxl.styles.fills import PatternFill
 
 from .formatting import _format_dataframe
 

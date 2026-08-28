@@ -1,6 +1,9 @@
-import re
+from typing import TYPE_CHECKING, Any
+if TYPE_CHECKING:
+    from .result import FlextabResult
 
 import pandas as pd
+import re
 
 
 def _parse_fmt_spec(spec: str):
@@ -52,7 +55,7 @@ def _parse_fmt_spec(spec: str):
     use_thousands = "_" in modifiers  # thousands grouping (opposite char of dec_sep)
     use_space_thous = "s" in modifiers  # thousands grouping with space
 
-    def _fmt(value):
+    def _fmt(value: Any) -> str:
         try:
             v = float(value)
         except (TypeError, ValueError):
@@ -80,7 +83,10 @@ def _parse_fmt_spec(spec: str):
     return _fmt
 
 
-def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
+def _format_dataframe(
+    result: pd.DataFrame,
+    fmt: str ="{:.3f}",
+    na_rep: str =".") -> pd.DataFrame:
     """Build a string-valued copy of result with per-column AND per-row formats applied.
 
     A format= spec can appear on either the row or the column dimension of
@@ -93,7 +99,7 @@ def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
     col_fmt_map = result.attrs.get("col_fmt_map", {})
     row_fmt_map = result.attrs.get("row_fmt_map", {})
 
-    def fmt_val(v, row_pos, col_pos):
+    def fmt_val(v: Any, row_pos: int, col_pos: int) -> str:
         if pd.isna(v):
             return na_rep
         formatter = col_fmt_map.get(col_pos) or row_fmt_map.get(row_pos)
@@ -114,7 +120,10 @@ def _format_dataframe(result, fmt="{:.3f}", na_rep="."):
     return formatted
 
 
-def flextab_to_string(result, fmt="{:.3f}", na_rep=".") -> str:
+def flextab_to_string(
+    result: "FlextabResult",
+    fmt: str ="{:.3f}",
+    na_rep: str =".") -> str:
     """Render a flextab() result as a formatted string.
 
     Parameters
@@ -151,7 +160,11 @@ def flextab_to_string(result, fmt="{:.3f}", na_rep=".") -> str:
     return _format_dataframe(result, fmt=fmt, na_rep=na_rep).to_string()
 
 
-def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
+def flextab_to_markdown(
+    result: "FlextabResult",
+    fmt: str="{:.3f}",
+    na_rep: str=".",
+    sep: str=" / ") -> str:
     """Render a flextab() result as a plain Markdown table.
 
     The table contains flattened, human-readable column headers instead of
@@ -215,7 +228,7 @@ def flextab_to_markdown(result, fmt="{:.3f}", na_rep=".", sep=" / ") -> str:
         # column structure.
         return text.replace("|", "\\|")
 
-    def _flatten(key) -> str:
+    def _flatten(key: object) -> str:
         if isinstance(key, tuple):
             parts = [str(p) for p in key if str(p) != ""]
             label = sep.join(parts) if parts else ""

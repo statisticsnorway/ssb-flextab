@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
 from .formatting import _parse_fmt_spec
 from .formatting import flextab_to_string
 from .parser import _classify_path
+from .parser import DimNode
 from .parser import _expand_node_with_branch
 from .parser import parse_table
 from .result import FlextabResult
@@ -411,7 +414,7 @@ def flextab(
     else:
         row_dim, col_dim = dims[0], dims[1]
 
-    def expand_dim(dim_node):
+    def expand_dim(dim_node: DimNode | None):
         if dim_node is None:
             return [
                 {
@@ -436,7 +439,7 @@ def flextab(
     col_specs = expand_dim(col_dim)
     row_specs = expand_dim(row_dim)
 
-    def spec_header(spec):
+    def spec_header(spec: dict[str, Any]) -> tuple[str, ...]:
         # Build a header tuple that uniquely identifies this spec.
         # For group entries, use the label when non-blank.
         # When the label is blank (suppressed with =''), fall back to the
@@ -460,7 +463,7 @@ def flextab(
                 parts.append(label)
         return tuple(parts) if parts else ("",)
 
-    def orig_groups(spec):
+    def orig_groups(spec: dict[str, Any]) -> list[str]:
         return [col for col, _ in spec["group_keys"]]
 
     cells: dict = {}
@@ -567,7 +570,10 @@ def flextab(
                 )
                 _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
 
-    def _index_value_key(orig_col, v):
+    def _index_value_key(
+        orig_col: str | None,
+        v: Any,
+    ) -> tuple[int, int | str]:
         """Return the sort key for ``sort_by='index'``.
 
         Order values by their position in the labels dictionary, using the
@@ -588,7 +594,10 @@ def flextab(
             return (0, keys_in_order.index(v))
         return (1, _na_safe_str(v))
 
-    def _label_text_value_key(orig_col, v):
+    def _label_text_value_key(
+        orig_col: str | None,
+        v: Any,
+    ) -> tuple[int, str]:
         """Sort key for sort_by='label': order alphabetically by the DISPLAY.
 
         LABEL TEXT (the dict's value), not by dict-write order and not by
@@ -604,7 +613,7 @@ def flextab(
             return (0, str(col_labels[v]))
         return (1, _na_safe_str(v))
 
-    def _na_safe_str(v):
+    def _na_safe_str(v: Any) -> str:
         if v is None or v == _NAN_SENTINEL:
             return ""
         try:
@@ -614,7 +623,10 @@ def flextab(
             pass
         return str(v)
 
-    def _sort_keys(keys, hdr_path):
+    def _sort_keys(
+        keys: list[tuple[Any, Any]],
+        hdr_path: dict[Any, tuple[list[Any], int]],
+    ) -> list[tuple[Any, Any]]:
         """Sort row/col keys, respecting sort_by='code', 'index', or 'label'."""
         if sort_by == "index" and _label_map:
             value_key_fn = _index_value_key
@@ -637,7 +649,10 @@ def flextab(
         for ck, val in col_dict.items():
             matrix[rk_pos[rk], ck_pos[ck]] = val
 
-    def _fmt_val(v, col_name=None):
+    def _fmt_val(
+        v: Any,
+        col_name: str | None = None,
+    ) -> str:
         """Format a group key value for display, applying label remapping.
 
         col_name : the original groupby column this value belongs to. Only
@@ -661,7 +676,9 @@ def flextab(
                 return str(col_labels[v])
         return str(v)
 
-    def _compute_slot_layout(all_path_orders):
+    def _compute_slot_layout(
+        all_path_orders: list[list[tuple[Any, ...]]],
+    ) -> list[int]:
         """Compute display slots per position across all specs.
 
         Each cross-position gets:
@@ -683,7 +700,12 @@ def flextab(
             slots.append(2 if has_labeled_group else 1)
         return slots
 
-    def _key_to_label_slotted(hdr, data_key, path_order, slots):
+    def _key_to_label_slotted(
+        hdr: Any,
+        data_key: Any,
+        path_order: list[tuple[Any, ...]],
+        slots: list[int],
+    ) -> Any:
         """Build a fixed-length index tuple using a pre-computed slot layout.
 
         D = sum(slots) levels total. Slots assigned bottom-up: the innermost
@@ -714,7 +736,7 @@ def flextab(
 
         row = [""] * D
 
-        def slot_range(local_pos):
+        def slot_range(local_pos: int) -> tuple[int, int]:
             # local_pos is the index within path_order (0 = outermost of THIS spec)
             # map to the global slots list (bottom-aligned)
             global_pos = len(slots) - len(path_order) + local_pos
@@ -751,7 +773,10 @@ def flextab(
 
         return tuple(row) if any(row) else ("",)
 
-    def make_index(keys, hdr_path):
+    def make_index(
+        keys: list[tuple[Any, Any]],
+        hdr_path: dict[Any, tuple[list[Any], int]],
+    ) -> pd.Index:
         """Convert (hdr, data_key) pairs to a MultiIndex using slot-based layout.
 
         Every spec in the dimension produces a fixed-length tuple of the same
@@ -868,7 +893,7 @@ def flextab(
 
 
 def _sort_row_keys(
-    row_keys: list, hdr_path: dict | None = None, value_key_fn=None
+    row_keys: list, hdr_path: dict | None = None, value_key_fn: str | None =None
 ) -> list:
     """Re-order row/column keys to follow the TABLE expression's written order.
 
@@ -919,7 +944,7 @@ def _sort_row_keys(
     """
     hdr_path = hdr_path or {}
 
-    def _normalise(v):
+    def _normalise(v: Any) -> str:
         if v is None or v == _NAN_SENTINEL:
             return ""
         try:
@@ -929,15 +954,15 @@ def _sort_row_keys(
             pass
         return str(v)
 
-    def _value_key(orig_col, v):
+    def _value_key(orig_col: str | None, v: Any) -> Any:
         if value_key_fn is not None:
             return value_key_fn(orig_col, v)
         return _normalise(v)
 
-    def _po(hdr):
+    def _po(hdr: Any) -> list[Any]:
         return hdr_path.get(hdr, ([], 0))[0]
 
-    def _branch(hdr):
+    def _branch(hdr: Any) -> int:
         return hdr_path.get(hdr, ([], 0))[1]
 
     # Determine the maximum path length and, for each position, whether ANY
@@ -995,7 +1020,7 @@ def _sort_row_keys(
                 if orig_col not in d:
                     d[orig_col] = len(d)
 
-    def sort_key(rk):
+    def sort_key(rk: tuple[Any, Any]) -> tuple[Any, ...]:
         hdr, dk = rk
         po = _po(hdr)
         branch = _branch(hdr)
@@ -1037,7 +1062,7 @@ def _sort_row_keys(
 _NAN_SENTINEL = "__nan__"
 
 
-def _normalise_key(val):
+def _normalise_key(val: Any) -> Any:
     """Normalise a group key value so that all missing-value representations.
 
     (float nan, pd.NA, pd.NaT, None) map to a single canonical object.
@@ -1056,12 +1081,19 @@ def _normalise_key(val):
     return val
 
 
-def _normalise_idx(idx_tuple):
+def _normalise_idx(idx_tuple: tuple):
     """Apply _normalise_key to every element of an index tuple."""
     return tuple(_normalise_key(v) for v in idx_tuple)
 
 
-def _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups):
+def _fill_cells(
+        cells: dict[Any, dict[Any, Any]],
+        series: pd.Series,
+        r_hdr: Any,
+        c_hdr: Any,
+        r_groups: list[str],
+        c_groups: list[str],
+    ) -> None:
     """Distribute a grouped Series into the cells dict."""
     n_r = len(r_groups)
     n_c = len(c_groups)

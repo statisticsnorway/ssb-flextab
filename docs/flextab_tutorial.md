@@ -10,22 +10,8 @@ one-line call to styled, exportable tables.
 
 ```python
 import pandas as pd
-import sys
-from pathlib import Path
 
-# Works both in VS Code and JupyterLab
-try:
-    project_root = Path(__file__).resolve().parent.parent
-except NameError:
-    # JupyterLab
-    project_root = Path.cwd().parent
-
-src_path = project_root / "src"
-
-if src_path.exists():
-    sys.path.append(str(src_path))
-
-from ssb_flextab.flextab import flextab, flextab_to_string, FlextabResult
+from ssb_flextab import flextab
 ```
 
 ## The data set
@@ -1393,8 +1379,6 @@ does, and flattens each column's levels into one readable label joined
 by `sep` (default `" / "`), dropping blank levels along the way:
 
 ```python
-from ssb_flextab.flextab import flextab_to_markdown
-
 flextab_to_markdown(tab)
 ```
 

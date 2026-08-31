@@ -15,6 +15,7 @@ dependencies = [
     "pandas (>=3.0.5,<4.0.0)",
     "openpyxl (>=3.1.5,<4.0.0)",
     "ipykernel (>=7.3.0,<8.0.0)",
+    "ruff (>=0.16.4,<0.17.0)",
 ]
 
 [project.urls]

@@ -13,12 +13,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ssb_flextab import FlextabResult
 from ssb_flextab import flextab
 from ssb_flextab import flextab_to_string
-
 from tests.helpers import cell
-
 
 # ---------------------------------------------------------------------------
 # Counts & missing-value handling

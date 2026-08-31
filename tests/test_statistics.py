@@ -1,6 +1,7 @@
 """
-Pytest suite for tabulate.statistics (weighted/unweighted stat functions and
-the row/column/percent aggregation engine).
+Pytest suite for ssb_flextab.statistics.
+
+The weighted/unweighted stat functions and the row/column/percent aggregation engine.
 
 Mirrors the style of test_parser.py: representative "typical" usages plus a
 dedicated section of invalid / edge-case inputs.
@@ -17,6 +18,7 @@ Covered:
 
 Run with:  pytest tests/test_statistics.py -v
 """
+
 from __future__ import annotations
 
 import math
@@ -25,27 +27,24 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ssb_flextab.statistics import (
-    ALL_STATS,
-    _BASE_STATS,
-    _PERCENT_STATS,
-    _WEIGHTED_STATS,
-    _clean_weights,
-    _compute_all_series,
-    _compute_custom_pct,
-    _compute_series,
-    _drop_nan_x,
-    _hmean,
-    _parse_denom_def,
-    _wgmean,
-    _whmean,
-    _wmean,
-    _wpercentile,
-    _wstd,
-    _wstderr,
-    _wvar,
-)
-
+from ssb_flextab.statistics import _BASE_STATS
+from ssb_flextab.statistics import _PERCENT_STATS
+from ssb_flextab.statistics import _WEIGHTED_STATS
+from ssb_flextab.statistics import ALL_STATS
+from ssb_flextab.statistics import _clean_weights
+from ssb_flextab.statistics import _compute_all_series
+from ssb_flextab.statistics import _compute_custom_pct
+from ssb_flextab.statistics import _compute_series
+from ssb_flextab.statistics import _drop_nan_x
+from ssb_flextab.statistics import _hmean
+from ssb_flextab.statistics import _parse_denom_def
+from ssb_flextab.statistics import _wgmean
+from ssb_flextab.statistics import _whmean
+from ssb_flextab.statistics import _wmean
+from ssb_flextab.statistics import _wpercentile
+from ssb_flextab.statistics import _wstd
+from ssb_flextab.statistics import _wstderr
+from ssb_flextab.statistics import _wvar
 
 # --------------------------------------------------------------------------
 # shared fixtures

@@ -1,5 +1,5 @@
 """
-Pytest suite for tabulate.parser (the TABLE-expression parser).
+Pytest suite for ssb_flextab.parser (the TABLE-expression parser).
 
 Covers:
   * tokenizing / parsing of representative expressions
@@ -15,27 +15,25 @@ Covers:
 
 Run with:  pytest tests/test_parser.py -v
 """
+
 from __future__ import annotations
 
 import pytest
 
-from ssb_flextab.parser import (
-    DimNode,
-    _classify_path,
-    _expand_node,
-    _expand_node_with_branch,
-    _split_dimensions,
-    _tokenize,
-    parse_table,
-)
-
+from ssb_flextab.parser import DimNode
+from ssb_flextab.parser import _classify_path
+from ssb_flextab.parser import _expand_node
+from ssb_flextab.parser import _expand_node_with_branch
+from ssb_flextab.parser import _split_dimensions
+from ssb_flextab.parser import _tokenize
+from ssb_flextab.parser import parse_table
 
 # --------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------
 
 def leaf_names(path: list[DimNode]) -> list[str]:
-    """Convenience: pull the .name off each node in an expanded leaf path."""
+    """Pull the .name off each node in an expanded leaf path."""
     return [n.name for n in path]
 
 

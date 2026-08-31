@@ -4,7 +4,6 @@ import pytest
 from ssb_flextab import FlextabResult
 from ssb_flextab import flextab
 
-from tests.helpers import cell
 
 class TestResultObject:
 

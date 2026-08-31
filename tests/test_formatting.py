@@ -1,5 +1,5 @@
 """
-Pytest suite for tabulate.formatting and tabulate.result (FlextabResult).
+Pytest suite for ssb_flextab.formatting and ssb_flextab.result (FlextabResult).
 
 Mirrors the style of test_parser.py / test_statistics.py: representative
 "typical" usages plus a dedicated section of invalid / edge-case inputs,
@@ -34,14 +34,11 @@ import pandas as pd
 import pytest
 from openpyxl import load_workbook
 
-from ssb_flextab.formatting import (
-    _format_dataframe,
-    _parse_fmt_spec,
-    flextab_to_markdown,
-    flextab_to_string,
-)
+from ssb_flextab.formatting import _format_dataframe
+from ssb_flextab.formatting import _parse_fmt_spec
+from ssb_flextab.formatting import flextab_to_markdown
+from ssb_flextab.formatting import flextab_to_string
 from ssb_flextab.result import FlextabResult
-
 
 # --------------------------------------------------------------------------
 # _parse_fmt_spec

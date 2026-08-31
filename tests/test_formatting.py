@@ -17,10 +17,10 @@ Covered:
   * FlextabResult static color helpers (_to_hex, _resolve_color) and
     _fmt_to_excel_numfmt.
   * FlextabResult.__repr__ / __str__ (default_fmt applied).
-  * FlextabResult._repr_html_, INCLUDING a real bug: default_fmt is
-    silently ignored whenever no style= key is set at all (falls back to
-    plain pandas HTML because of a NameError swallowed by a bare
-    `except Exception`).
+  * FlextabResult._repr_html_, including a regression test for a bug
+    that used to make default_fmt silently ignored whenever no style=
+    key was set at all (it fell back to plain pandas HTML because of a
+    NameError swallowed by a bare `except Exception`) — now fixed.
   * FlextabResult.to_excel — number formats and colour fills, single- and
     multi-level columns, row_fmt_map vs col_fmt_map.
   * Invalid usages (bad format specs, unrecognised colours).
@@ -372,30 +372,44 @@ class TestReprHtml:
         assert "<table" in html
         assert "Income" in html
 
-    def test_bug_default_fmt_is_ignored_when_no_style_key_is_set(self):
-        """Documents a real bug in the current implementation.
+    def test_default_fmt_is_applied_even_when_no_style_key_is_set(self):
+        """Regression test for a fixed bug.
 
         `_style_one_th` and the `for line in lines:` loop that applies
-        default_fmt-aware formatting are (due to an indentation slip)
-        OUTSIDE the `if any_style:` block that defines `lines`. When no
-        style key is set at all, `any_style` is False, `lines` is never
-        defined, the loop raises NameError, and the surrounding
-        `except Exception` swallows it — silently falling back to plain
-        pandas HTML with the RAW float values instead of applying
-        default_fmt. This test pins that (surprising) current behavior
-        rather than the documented/intended one, so it will fail (in a
-        good way) the moment this bug is fixed.
+        default_fmt-aware formatting used to sit OUTSIDE the
+        `if any_style:` block that defines `lines`, due to an indentation
+        slip. When no style key was set, `any_style` was False, `lines`
+        was never defined, the loop raised NameError, and the surrounding
+        `except Exception` silently swallowed it — falling back to plain
+        pandas HTML with RAW float values instead of applying
+        default_fmt. That block is now correctly nested inside
+        `if any_style:`, and the `return html` right after (which uses
+        whichever `html` value is live in each branch) handles the no-op
+        case too, so default_fmt applies in both the styled and unstyled
+        paths.
         """
         idx = pd.Index(["M", "F"], name="Sex")
         r = FlextabResult({"Income": [100.1234, 200.5678]}, index=idx)
         r.attrs["default_fmt"] = "{:.0f}"
         html = r._repr_html_()
-        # The requested 0-decimal formatting did NOT get applied...
-        assert "100.1234" in html
-        # ...and the fallback plain-pandas rendering's border/style
-        # wrapper leaked through instead of the plain <table class=...>
-        # that a successful custom render would have produced.
-        assert '<table border="1"' in html
+        # The requested 0-decimal formatting is applied...
+        assert "100.1234" not in html
+        assert ">100<" in html
+        assert ">201<" in html
+        # ...and no plain-pandas fallback wrapper leaks through.
+        assert '<table border="1"' not in html
+        assert "<style scoped>" not in html
+
+    def test_no_style_and_no_default_fmt_still_renders_plain_values(self):
+        # With neither style nor default_fmt set, the table should still
+        # render via the "real" code path (not the exception fallback),
+        # showing pandas' normal default float rendering.
+        idx = pd.Index(["M", "F"], name="Sex")
+        r = FlextabResult({"Income": [100.0, 200.0]}, index=idx)
+        html = r._repr_html_()
+        assert '<table border="1"' not in html
+        assert "<style scoped>" not in html
+        assert ">100.0<" in html
 
     def test_formatting_is_applied_once_any_style_key_is_set(self):
         # Setting even one style key makes `any_style` True, which takes

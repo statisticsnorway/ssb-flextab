@@ -1,7 +1,8 @@
 # TABLE parser, statistics & formatting test suite
 
-`tabulate/parser.py`, `tabulate/statistics.py`, `tabulate/result.py`, and
-`tabulate/formatting.py` are your uploaded files, unchanged.
+`tabulate/parser.py`, `tabulate/statistics.py`, and `tabulate/formatting.py`
+are your uploaded files, unchanged. `tabulate/result.py` has one fix applied
+(see below) relative to what you uploaded.
 
 Run everything with:
 
@@ -15,15 +16,25 @@ Or just one file:
     pytest tests/test_statistics.py -v
     pytest tests/test_formatting.py -v
 
-## Heads-up: a real bug pinned by a test
+## Bug fixed in result.py
 
-`tests/test_formatting.py::TestReprHtml::test_bug_default_fmt_is_ignored_when_no_style_key_is_set`
-documents a bug in `FlextabResult._repr_html_` (result.py): `_style_one_th`
-and the `for line in lines:` loop are indented one level too shallow, so
-they sit OUTSIDE the `if any_style:` block that defines `lines`. When
-`style=` is empty/unset, `any_style` is False, `lines` is never assigned,
-the loop raises `NameError`, and the surrounding bare `except Exception`
-silently falls back to plain pandas HTML — meaning `default_fmt` is
-completely ignored (raw floats show up) any time no `style` key is set.
-The moment you fix the indentation, that one test will start failing —
-that's expected; just update it to assert the fixed behavior.
+`FlextabResult._repr_html_` had an indentation slip: `_style_one_th` and
+the `for line in lines:` loop sat OUTSIDE the `if any_style:` block that
+defines `lines`. Whenever `style=` was empty/unset, `any_style` was
+`False`, `lines` was never assigned, the loop raised `NameError`, and the
+surrounding bare `except Exception` silently fell back to plain pandas
+HTML — meaning `default_fmt` was completely ignored (raw floats leaked
+through) any time no style key was set.
+
+Fix: re-indented `_style_one_th` through `html = "\n".join(out)` one level
+deeper so they're nested inside `if any_style:`. The `return html`
+statement right after picks up whichever `html` value is live in each
+branch (the freshly formatted `formatted.to_html(border=0)` when
+`any_style` is False, the re-styled version when it's True), so both
+paths now render correctly with no fallback.
+
+`tests/test_formatting.py::TestReprHtml` now has a regression test
+(`test_default_fmt_is_applied_even_when_no_style_key_is_set`) confirming
+default_fmt is honored with no style set, plus a companion test
+confirming the plain no-style/no-fmt case never hits the exception
+fallback either.

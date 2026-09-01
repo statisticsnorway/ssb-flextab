@@ -16,6 +16,7 @@ def df():
         }
     )
 
+
 @pytest.fixture
 def labels():
     return {
@@ -28,4 +29,3 @@ def labels():
             "1": "Elementary school",
         },
     }
-

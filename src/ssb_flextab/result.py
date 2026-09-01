@@ -14,27 +14,40 @@ from .formatting import _format_dataframe
 
 
 class FlextabResult(pd.DataFrame):
-    """DataFrame subclass returned by flextab().
+    """DataFrame subclass returned by ``flextab()``.
 
-    Numeric values are fully preserved — arithmetic, .sum(), slicing, and
-    all other DataFrame operations work exactly as on a plain DataFrame.
-    The only difference is in how the result is *displayed* and *exported*:
+    Numeric values are fully preserved. Arithmetic, ``.sum()``, slicing, and
+    other DataFrame operations work as on a regular ``pd.DataFrame``.
 
-      * print(result)              applies format= specs via __str__
-      * repr(result)               same
-      * bare expression in Jupyter applies format= specs and CSS colours
-                                   via _repr_html_
-      * result.to_excel(path)      writes an Excel file with number
-                                   formatting and colour styling preserved
+    The main differences are in display and export behaviour:
 
-    Use flextab_to_string(result, fmt, na_rep) for full string control.
+    - ``print(result)`` applies ``format=`` specifications via ``__str__``.
+    - ``repr(result)`` applies the same formatting.
+    - Jupyter display applies ``format=`` specifications and CSS colours via
+    ``_repr_html_``.
+    - ``result.to_excel(path)`` writes an Excel file with number formatting and
+    colour styling preserved.
 
-    Attrs (result.attrs)
-    --------------------
-    col_fmt_map  : dict {col_position -> callable}  column formatters
-    row_fmt_map  : dict {row_position -> callable}  row formatters
-    default_fmt  : str   fallback Python format string
-    style        : dict  colour styling (see flextab() style= parameter)
+    Use ``flextab_to_string(result, fmt, na_rep)`` for explicit control over
+    plain-text rendering.
+
+    Notes
+    -----
+    Display and export metadata are stored in ``result.attrs``. Relevant keys
+    include:
+
+    ``col_fmt_map``
+        Mapping from column position to formatter callable.
+
+    ``row_fmt_map``
+        Mapping from row position to formatter callable.
+
+    ``default_fmt``
+        Fallback Python format string.
+
+    ``style``
+        Colour styling configuration. See the ``style`` parameter in
+        ``flextab()``.
     """
 
     _metadata: ClassVar[list[str]] = []
@@ -371,42 +384,51 @@ class FlextabResult(pd.DataFrame):
         sheet_name: str = "Sheet1",
         **kwargs: Any,
     ) -> None:
-        """Write to an Excel file with number formatting and colour styling.
+        """Write the result to Excel with formatting and colour styling.
 
         Parameters
         ----------
-        excel_writer : str, Path, or ExcelWriter
-            File path (str/Path) or an open pd.ExcelWriter.
-        sheet_name : str, default 'Sheet1'
-        **kwargs    : passed through to pd.DataFrame.to_excel()
+        excel_writer : str | Path | pd.ExcelWriter
+            File path or open pandas Excel writer.
 
-        Number formatting
-        -----------------
-        Cells that have a format= spec in the TABLE expression receive the
-        equivalent Excel number format (e.g. format=7,1 → '#,##0.0' with
-        European decimal-comma adjustment).  This means the values remain
-        numeric in Excel and sort/sum correctly, while displaying with the
-        requested decimal places and separators.
+        sheet_name : str
+            Name of the worksheet to write to.
 
-        Colour styling
-        --------------
-        All keys from the style= dict passed to flextab() are applied:
-          header_bg     / header_fg      — column header cells
-          row_bg        / row_fg         — row index cells (the groupby
-                                            label/value cells on the left)
-          row_header_bg / row_header_fg  — the corner cell holding the
-                                            row_header= text
-          cell_bg       / cell_fg        — the table's data cells
+        **kwargs : Any
+            Additional keyword arguments passed to ``pd.DataFrame.to_excel()``.
 
-        Every key accepts a single colour (applied to every row) or a
-        (colour0, colour1) 2-tuple that cycles through rows.
+        Returns
+        -------
+        None
+            The result is written to the supplied file path or Excel writer.
 
         Notes
         -----
-        If excel_writer is a file path (str or Path), the file is written
-        and post-processed in one step. If it is an open ExcelWriter, the
-        sheet is formatted immediately after writing but the caller must
-        call ExcelWriter.close() / use it as a context manager to save.
+        Cells with a ``format=`` specification in the TABLE expression receive a
+        corresponding Excel number format. For example, ``format=7,1`` is converted
+        to an Excel number format with one decimal place and thousands grouping.
+        Values remain numeric in Excel and can therefore be sorted, summed, and used
+        in formulas.
+
+        Excel number formats are stored using Excel's locale-independent format
+        syntax. Decimal and thousands separators are displayed according to the
+        user's regional Excel settings.
+
+        Colour styling from the ``style`` dictionary supplied to ``flextab()`` is
+        also applied during export. Supported style keys are:
+
+        - ``header_bg`` and ``header_fg`` for column header cells.
+        - ``row_bg`` and ``row_fg`` for row index cells.
+        - ``row_header_bg`` and ``row_header_fg`` for the row-header cell.
+        - ``cell_bg`` and ``cell_fg`` for data cells.
+
+        Each style key may contain either a single colour, applied uniformly, or a
+        two-element sequence of colours that alternates between rows.
+
+        If ``excel_writer`` is a file path, the file is written and post-processed
+        in one operation. If it is an open ``pd.ExcelWriter``, the worksheet is
+        formatted immediately after writing, but the caller remains responsible for
+        closing the writer or using it as a context manager.
         """
         import io
 

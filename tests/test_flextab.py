@@ -276,10 +276,10 @@ class TestRowHeader:
             assert r.index.name == "Sex"
 
 
-
 # ---------------------------------------------------------------------------
 # Descriptive statistics
 # ---------------------------------------------------------------------------
+
 
 class TestDescriptiveStats:
 
@@ -338,6 +338,7 @@ class TestDescriptiveStats:
         expected = np.exp(np.log(positive).mean())
         assert cell(r, "", "GMEAN") == pytest.approx(expected)
 
+
 class TestWeighted:
 
     def _weighted_ref(self, group, x="income", w="weight"):
@@ -368,11 +369,12 @@ class TestWeighted:
         sex2_rows_with_weight = ((df["sex"] == "2") & df["weight"].notna()).sum()
         assert cell(r, ("sex", "2"), "N") == sex2_rows_with_weight
 
+
 class TestFormatting:
 
-# ---------------------------------------------------------------------------
-# Formatting
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Formatting
+    # ---------------------------------------------------------------------------
 
     def test_format_spec_controls_decimal_places(self, df):
         r = flextab(

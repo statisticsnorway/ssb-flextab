@@ -50,6 +50,7 @@ from ssb_flextab.statistics import _wvar
 # shared fixtures
 # --------------------------------------------------------------------------
 
+
 @pytest.fixture
 def df():
     """5-row toy dataset: 2 sexes crossed unevenly with 2 regions."""
@@ -69,6 +70,7 @@ def approx(v):
 # --------------------------------------------------------------------------
 # _hmean — unweighted harmonic mean
 # --------------------------------------------------------------------------
+
 
 class TestHmean:
     def test_matches_hand_computed_value(self):
@@ -91,6 +93,7 @@ class TestHmean:
 # --------------------------------------------------------------------------
 # _clean_weights / _drop_nan_x
 # --------------------------------------------------------------------------
+
 
 class TestWeightCleaning:
     def test_negative_weights_zeroed_positive_untouched(self):
@@ -120,6 +123,7 @@ class TestWeightCleaning:
 # --------------------------------------------------------------------------
 # Weighted statistic functions
 # --------------------------------------------------------------------------
+
 
 class TestWeightedMean:
     def test_equal_weights_matches_plain_mean(self):
@@ -254,6 +258,7 @@ class TestWeightedGeometricAndHarmonicMean:
 # _parse_denom_def
 # --------------------------------------------------------------------------
 
+
 class TestParseDenomDef:
     def test_single_token_uppercased(self):
         assert _parse_denom_def("income") == ["INCOME"]
@@ -271,6 +276,7 @@ class TestParseDenomDef:
 # --------------------------------------------------------------------------
 # ALL_STATS / stat-table consistency
 # --------------------------------------------------------------------------
+
 
 class TestStatTables:
     def test_all_stats_is_union_of_base_and_percent(self):
@@ -294,6 +300,7 @@ class TestStatTables:
 # --------------------------------------------------------------------------
 # _compute_series — plain (non-ALL) groupby aggregation
 # --------------------------------------------------------------------------
+
 
 class TestComputeSeriesBasic:
     def test_mean_by_single_group(self, df):
@@ -320,8 +327,12 @@ class TestComputeSeriesBasic:
         assert s["__total__"] == 150.0
 
     def test_missing_true_keeps_nan_group_missing_false_drops_it(self):
-        d = pd.DataFrame({"sex": ["M", "M", "F", None], "income": [10.0, 20.0, 30.0, 40.0]})
-        dropped = _compute_series(d, ["sex"], "income", "SUM", ["sex"], [], missing=False)
+        d = pd.DataFrame(
+            {"sex": ["M", "M", "F", None], "income": [10.0, 20.0, 30.0, 40.0]}
+        )
+        dropped = _compute_series(
+            d, ["sex"], "income", "SUM", ["sex"], [], missing=False
+        )
         kept = _compute_series(d, ["sex"], "income", "SUM", ["sex"], [], missing=True)
         assert set(dropped.index) == {"M", "F"}
         assert len(kept) == 3
@@ -376,7 +387,9 @@ class TestComputeSeriesWeighted:
                 "wt": [1.0, 3.0, 1.0, 2.0],
             }
         )
-        s = _compute_series(d, ["sex"], "income", "MEAN", ["sex"], [], missing=False, weight="wt")
+        s = _compute_series(
+            d, ["sex"], "income", "MEAN", ["sex"], [], missing=False, weight="wt"
+        )
         assert s["M"] == approx((10 * 1 + 20 * 3) / (1 + 3))
         assert s["F"] == approx((30 * 1 + 40 * 2) / (1 + 2))
 
@@ -388,8 +401,12 @@ class TestComputeSeriesWeighted:
                 "wt": [-1.0, 2.0],
             }
         )
-        mean = _compute_series(d, ["sex"], "income", "MEAN", ["sex"], [], missing=False, weight="wt")
-        n = _compute_series(d, ["sex"], None, "N", ["sex"], [], missing=False, weight="wt")
+        mean = _compute_series(
+            d, ["sex"], "income", "MEAN", ["sex"], [], missing=False, weight="wt"
+        )
+        n = _compute_series(
+            d, ["sex"], None, "N", ["sex"], [], missing=False, weight="wt"
+        )
         # negative weight -> 0, so only the 40-row contributes to the mean
         assert mean["F"] == approx(40.0)
         # but N is a plain count, unaffected by the weight value
@@ -403,7 +420,9 @@ class TestComputeSeriesWeighted:
                 "wt": [1.0, np.nan],
             }
         )
-        n = _compute_series(d, ["sex"], None, "N", ["sex"], [], missing=False, weight="wt")
+        n = _compute_series(
+            d, ["sex"], None, "N", ["sex"], [], missing=False, weight="wt"
+        )
         assert n["M"] == 1
 
 
@@ -411,10 +430,17 @@ class TestComputeSeriesWeighted:
 # _compute_all_series — ALL/TOTAL margins
 # --------------------------------------------------------------------------
 
+
 class TestComputeAllSeries:
     def test_all_on_rows_sums_by_remaining_column_group(self, df):
         s = _compute_all_series(
-            df, ["region"], "income", "SUM", missing=False, r_groups=[], c_groups=["region"]
+            df,
+            ["region"],
+            "income",
+            "SUM",
+            missing=False,
+            r_groups=[],
+            c_groups=["region"],
         )
         assert s["E"] == 80.0  # 10+30+40
         assert s["W"] == 70.0  # 20+50
@@ -422,7 +448,13 @@ class TestComputeAllSeries:
     def test_all_on_rows_colpctn_is_always_100(self, df):
         # The ALL row IS the column total, so COLPCTN against it is 100%.
         s = _compute_all_series(
-            df, ["region"], None, "COLPCTN", missing=False, r_groups=[], c_groups=["region"]
+            df,
+            ["region"],
+            None,
+            "COLPCTN",
+            missing=False,
+            r_groups=[],
+            c_groups=["region"],
         )
         assert s["E"] == approx(100.0)
         assert s["W"] == approx(100.0)
@@ -440,13 +472,16 @@ class TestComputeAllSeries:
         )
         assert s["__total__"] == 150.0
 
-        n = _compute_all_series(df, [], None, "N", missing=False, r_groups=[], c_groups=[])
+        n = _compute_all_series(
+            df, [], None, "N", missing=False, r_groups=[], c_groups=[]
+        )
         assert n["__total__"] == 5
 
 
 # --------------------------------------------------------------------------
 # _compute_custom_pct — PCTN<...> / PCTSUM<...>
 # --------------------------------------------------------------------------
+
 
 class TestComputeCustomPct:
     def test_denom_token_matching_innermost_groupby_collapses_it(self, df):
@@ -516,6 +551,7 @@ class TestComputeCustomPct:
 # Invalid usages / edge cases
 # --------------------------------------------------------------------------
 
+
 class TestInvalidUsage:
     def test_mean_without_measure_raises(self, df):
         with pytest.raises(ValueError, match="requires a measure variable"):
@@ -531,12 +567,20 @@ class TestInvalidUsage:
 
     def test_unknown_statistic_raises(self, df):
         with pytest.raises(ValueError, match="Unknown statistic"):
-            _compute_series(df, ["sex"], "income", "NOTASTAT", ["sex"], [], missing=False)
+            _compute_series(
+                df, ["sex"], "income", "NOTASTAT", ["sex"], [], missing=False
+            )
 
     def test_all_series_mean_without_measure_raises(self, df):
         with pytest.raises(ValueError, match="requires a measure variable"):
             _compute_all_series(
-                df, ["region"], None, "MEAN", missing=False, r_groups=[], c_groups=["region"]
+                df,
+                ["region"],
+                None,
+                "MEAN",
+                missing=False,
+                r_groups=[],
+                c_groups=["region"],
             )
 
     def test_n_count_size_do_not_require_a_measure(self, df):
@@ -552,12 +596,20 @@ class TestInvalidUsage:
             {"sex": ["M", "M"], "region": ["E", "W"], "income": [0.0, 0.0]}
         )
         s = _compute_series(
-            d, ["sex", "region"], "income", "ROWPCTSUM", ["sex"], ["region"], missing=False
+            d,
+            ["sex", "region"],
+            "income",
+            "ROWPCTSUM",
+            ["sex"],
+            ["region"],
+            missing=False,
         )
         assert s.isna().all()
 
     def test_empty_dataframe_grand_total_is_nan_or_zero_not_an_exception(self):
-        d = pd.DataFrame({"sex": pd.Series([], dtype=object), "income": pd.Series([], dtype=float)})
+        d = pd.DataFrame(
+            {"sex": pd.Series([], dtype=object), "income": pd.Series([], dtype=float)}
+        )
         s = _compute_series(d, [], "income", "SUM", [], [], missing=False)
         # sum of empty series is 0.0 in pandas
         assert s["__total__"] == 0.0

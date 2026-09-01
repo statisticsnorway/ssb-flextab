@@ -294,7 +294,7 @@ def _compute_series(
         Grouping columns in the column dimension.
     missing : bool
         Whether missing group values should be included.
-    weight : str | None, default None
+    weight : str | None
         Optional weight column name.
 
     Returns
@@ -469,14 +469,44 @@ def _compute_all_series(
 
     Parameters
     ----------
-    data           : filtered DataFrame
-    groups_to_keep : groupby columns to aggregate over (the non-ALL side)
-    var            : measure column name, or None for count-only stats
-    stat           : statistic keyword
-    missing        : controls dropna= in groupby
-    r_groups       : row-dimension groupby columns (for COLPCTN denominator)
-    c_groups       : col-dimension groupby columns (for ROWPCTN denominator)
-    weight         : optional weight column name
+    data : pd.DataFrame
+        Filtered input data.
+
+    groups_to_keep : list[str]
+        Groupby columns to aggregate over on the non-ALL side.
+
+    var : str | None
+        Measure column name, or None for count-only statistics.
+
+    stat : str
+        Statistic keyword.
+
+    missing : bool
+        Whether missing values should be retained in grouping operations.
+
+    r_groups : list[str] | None
+        Row-dimension groupby columns, used for the COLPCTN denominator.
+
+    c_groups : list[str] | None
+        Column-dimension groupby columns, used for the ROWPCTN denominator.
+
+    weight : str | None
+        Optional weight column name.
+
+    Returns
+    -------
+    pd.Series
+        Aggregated values for the requested statistic and ALL/TOTAL margin,
+        indexed by the grouping columns that remain after collapsing the ALL
+        dimension.
+
+    Raises
+    ------
+    ValueError
+        If ``var`` is None for a statistic that requires a measure variable.
+        Without a measure, only plain count statistics such as ``N``,
+        ``COUNT``, and ``SIZE``, and supported count-based percentage
+        statistics, can be computed.
 
     Notes
     -----
@@ -677,69 +707,86 @@ def _compute_custom_pct(
     """Compute a percentage statistic with a user-defined denominator.
 
     This implements the ``PCTN<...>`` and ``PCTSUM<...>`` syntax, where the
-    content of ``<...>`` specifies what the denominator should be.
+    content of ``<...>`` specifies how the denominator should be resolved.
 
     Parameters
     ----------
     data : pd.DataFrame
         Input data used to compute the numerator and denominator.
+
     r_groups : list
         Grouping columns in the row dimension.
+
     c_groups : list
         Grouping columns in the column dimension.
+
     var : str
         Measure column used for the numerator.
+
     stat : str
         Percentage statistic to compute.
+
     denom_def : str
         Denominator definition from the ``<...>`` expression.
+
     groupby : list
         Available grouping variables.
+
     measure : list
         Available measure variables.
+
     missing : bool
         Whether missing grouping values should be included.
-    weight : str | None, default None
-        Optional weight column.
-    r_path_order : list | None, default None
+
+    weight : str | None
+        Optional name of the weight column.
+
+    r_path_order : list | None
         Parsed row path used to determine the innermost breakdown variable.
-    c_path_order : list | None, default None
+
+    c_path_order : list | None
         Parsed column path used to determine the innermost breakdown variable.
 
     Returns
     -------
     pd.Series
-        Computed percentage values indexed by the relevant grouping keys.
+        Percentage values indexed by the relevant grouping keys.
 
     Notes
     -----
-    Denominator resolution is performed per row.
+    Denominator resolution is performed separately for each table
+    specification.
 
     If the innermost entry is ``"all"``, the first ``"ALL"`` or ``"TOTAL"``
-    token is preferred. A class variable that is not in the current grouping
-    may instead act as a parent subtotal level.
+    token is preferred. A grouping variable that is not part of the current
+    grouping may instead define a parent subtotal.
 
-    If the innermost entry is a group with original column ``X``, the token
-    matching ``X`` is preferred. The denominator is then obtained by
-    collapsing ``X`` from the current grouping.
+    If the innermost entry is a grouping variable with original column
+    ``X``, the denominator token matching ``X`` is preferred. The denominator
+    is then obtained by collapsing ``X`` from the current grouping.
 
-    Measure-variable tokens use the same groups as the numerator.
+    A denominator token that refers to a measure variable uses the same
+    grouping as the numerator.
 
-    If no preferred token matches, the tokens are tried from left to right,
-    with the grand total as the final fallback.
+    If no preferred token matches, denominator tokens are tried from left to
+    right, with the grand total used as the final fallback.
+
+    When ``weight`` is supplied, weighted sums are used for measure-based
+    numerator and denominator calculations. Rows with missing weights are
+    excluded, and negative weights are treated according to the package's
+    weight-cleaning rules.
 
     Examples
     --------
-    ``pctn<total gender age_group>`` with row specification
-    ``origin*(Total gender age_group)`` gives:
+    ``pctn<total gender age_group>`` with the row specification
+    ``origin*(Total gender age_group)`` produces denominator behaviour such
+    that the Total row uses the grand total, while the Gender and Age-group
+    rows use the corresponding parent subtotal.
 
-    - Total row: grand-total denominator.
-    - Gender row: origin subtotal denominator.
-    - Age-group row: origin subtotal denominator.
+    ``pctsum<income>`` uses ``income`` as the denominator measure with the
+    same grouping as the numerator.
 
-    ``pctsum<income>`` uses the same grouping for numerator and denominator.
-
-    ``pctn<gender all>`` uses the gender subtotal and falls back to the
+    ``pctn<gender all>`` prefers the gender subtotal and falls back to the
     grand total.
     """
     measure_upper = [m.upper() for m in (measure or [])]

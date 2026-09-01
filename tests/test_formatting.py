@@ -27,6 +27,7 @@ Covered:
 
 Run with:  pytest tests/test_formatting.py -v
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -43,6 +44,7 @@ from ssb_flextab.result import FlextabResult
 # --------------------------------------------------------------------------
 # _parse_fmt_spec
 # --------------------------------------------------------------------------
+
 
 class TestParseFmtSpecValid:
     @pytest.mark.parametrize(
@@ -92,14 +94,14 @@ class TestParseFmtSpecInvalid:
     @pytest.mark.parametrize(
         "spec",
         [
-            "abc",       # no digits/separator at all
-            "7",         # missing separator + decimals
-            "7.",        # missing decimals
-            ".5",        # missing width
-            "7.1x",      # unrecognised trailing modifier
-            "",          # empty
-            "7;1",       # wrong separator character
-            "-7.1",      # negative width not allowed
+            "abc",  # no digits/separator at all
+            "7",  # missing separator + decimals
+            "7.",  # missing decimals
+            ".5",  # missing width
+            "7.1x",  # unrecognised trailing modifier
+            "",  # empty
+            "7;1",  # wrong separator character
+            "-7.1",  # negative width not allowed
         ],
     )
     def test_raises_value_error(self, spec):
@@ -110,6 +112,7 @@ class TestParseFmtSpecInvalid:
 # --------------------------------------------------------------------------
 # _format_dataframe
 # --------------------------------------------------------------------------
+
 
 @pytest.fixture
 def plain_df():
@@ -175,6 +178,7 @@ class TestFormatDataframe:
 # flextab_to_string
 # --------------------------------------------------------------------------
 
+
 class TestFlextabToString:
     def test_basic_rendering_contains_formatted_values(self):
         idx = pd.Index(["M", "F"], name="Sex")
@@ -194,6 +198,7 @@ class TestFlextabToString:
 # --------------------------------------------------------------------------
 # flextab_to_markdown
 # --------------------------------------------------------------------------
+
 
 class TestFlextabToMarkdown:
     def test_multiindex_columns_are_flattened_with_separator(self):
@@ -229,13 +234,17 @@ class TestFlextabToMarkdown:
         assert md.splitlines()[0].count("|") == 4  # leading/trailing + 2 real cols
 
     def test_multiindex_rows_produce_one_column_per_level(self):
-        ridx = pd.MultiIndex.from_tuples([("M", "E"), ("M", "W")], names=["Sex", "Region"])
+        ridx = pd.MultiIndex.from_tuples(
+            [("M", "E"), ("M", "W")], names=["Sex", "Region"]
+        )
         r = FlextabResult([[1.0], [2.0]], index=ridx, columns=pd.Index(["Income"]))
         md = flextab_to_markdown(r)
         assert "| Sex | Region | Income |" == md.splitlines()[0]
 
     def test_unnamed_index_gets_blank_header_cell(self):
-        r = FlextabResult([[1.0], [2.0]], index=pd.Index(["a", "b"]), columns=pd.Index(["Income"]))
+        r = FlextabResult(
+            [[1.0], [2.0]], index=pd.Index(["a", "b"]), columns=pd.Index(["Income"])
+        )
         md = flextab_to_markdown(r)
         assert md.splitlines()[0] == "|  | Income |"
 
@@ -258,6 +267,7 @@ class TestFlextabToMarkdown:
 # --------------------------------------------------------------------------
 # FlextabResult static colour helpers
 # --------------------------------------------------------------------------
+
 
 class TestToHex:
     def test_named_colors(self):
@@ -342,6 +352,7 @@ class TestFmtToExcelNumfmt:
 # FlextabResult.__repr__ / __str__
 # --------------------------------------------------------------------------
 
+
 class TestReprAndStr:
     def test_default_repr_uses_default_fmt_of_one_decimal(self):
         idx = pd.Index(["M", "F"], name="Sex")
@@ -363,6 +374,7 @@ class TestReprAndStr:
 # --------------------------------------------------------------------------
 # FlextabResult._repr_html_
 # --------------------------------------------------------------------------
+
 
 class TestReprHtml:
     def test_no_style_set_renders_a_table_with_the_income_header(self):
@@ -453,6 +465,7 @@ class TestReprHtml:
 # FlextabResult.to_excel
 # --------------------------------------------------------------------------
 
+
 class TestToExcel:
     def test_col_fmt_map_sets_number_format_on_the_right_column_only(self, tmp_path):
         idx = pd.Index(["M", "F"], name="Sex")
@@ -475,9 +488,7 @@ class TestToExcel:
     def test_row_fmt_map_sets_number_format_across_that_data_row(self, tmp_path):
         cols = pd.MultiIndex.from_tuples([("SUM", "Income"), ("MEAN", "Income")])
         idx = pd.Index(["M", "F"], name="Sex")
-        r = FlextabResult(
-            [[100.0, 50.0], [200.0, 66.6667]], index=idx, columns=cols
-        )
+        r = FlextabResult([[100.0, 50.0], [200.0, 66.6667]], index=idx, columns=cols)
         r.attrs["row_fmt_map"] = {1: _parse_fmt_spec("7,2")}
         path = tmp_path / "out2.xlsx"
         r.to_excel(path)
@@ -537,6 +548,7 @@ class TestToExcel:
 # --------------------------------------------------------------------------
 # Invalid usage / edge cases
 # --------------------------------------------------------------------------
+
 
 class TestInvalidUsage:
     def test_bad_format_spec_in_format_dataframe_col_map_would_raise_at_construction(

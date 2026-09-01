@@ -10,41 +10,55 @@ import pandas as pd
 
 
 def _parse_fmt_spec(spec: str):
-    """Parse a format specification string and return a callable formatter.
+    """Parse a TABLE format specification into a formatter callable.
 
-    Called internally when a *format=... suffix is encountered in the TABLE
-    expression.  The resulting formatter is stored in result.attrs['col_fmt_map']
-    or result.attrs['row_fmt_map'] and applied per-cell by _format_dataframe().
+    The formatter is used internally for ``format=`` specifications in the
+    TABLE expression and is stored in ``result.attrs`` for later display and
+    export formatting.
 
-    Syntax:  W<sep>D[modifier]
-      W         total width (accepted for SAS compatibility, ignored in output
-                since Python handles column width automatically)
-      <sep>     the decimal separator character:
-                  '.'  decimal point  (standard)
-                  ','  decimal comma  (European style)
-      D         number of decimal places
-      modifier  optional trailing character(s):
-                  '_'  add a thousands separator using the OTHER separator
-                       character: if sep='.', thousands uses ','; if sep=',',
-                       thousands uses '.'
-                  's'  add a thousands separator using a SPACE
+    Supported syntax is ``W<sep>D[modifier]``, where:
 
-    The W and sep together determine the output style — W itself is not
-    used for padding since flextab() returns string-valued cells.
+    - ``W`` is the total width. It is accepted for SAS compatibility but is
+      not used for output padding.
+    - ``<sep>`` is either ``"."`` for decimal point or ``","`` for decimal
+      comma.
+    - ``D`` is the number of decimal places.
+    - ``modifier`` may be ``"_"`` for thousands grouping using the opposite
+      separator, or ``"s"`` for space-separated thousands.
 
-    Examples
-    --------
-      "7.1"   -> 1 decimal, point:              1 234.6
-      "7,2"   -> 2 decimals, comma:             1 234,56
-      "12.0_" -> 0 decimals, comma thousands:   1,235
-      "7,2_"  -> 2 decimals, European:          1.234,56
-      "9.0s"  -> 0 decimals, space thousands:   1 235
-      "7,2s"  -> 2 decimals, comma + space:     1 234,56
+    Parameters
+    ----------
+    spec : str
+        Format specification, for example ``"7.1"``, ``"7,2_"``, or
+        ``"9.0s"``.
 
     Returns
     -------
-    Callable (value: Any) -> str
-        A formatting function.  Non-numeric values are returned as str(value).
+    Callable
+        Formatter callable accepting a value and returning its formatted
+        string representation.
+
+    Raises
+    ------
+    ValueError
+        If ``spec`` does not match the supported ``W.D`` or ``W,D`` syntax.
+
+    Examples
+    --------
+    ``"7.1"``
+        One decimal place with decimal point.
+
+    ``"7,2"``
+        Two decimal places with decimal comma.
+
+    ``"12.0_"``
+        No decimal places and thousands grouping.
+
+    ``"7,2_"``
+        Two decimal places with European-style separators.
+
+    ``"9.0s"``
+        No decimal places and space-separated thousands.
     """
     m = re.fullmatch(r"[0-9]+([.,])([0-9]+)([_s]*)", spec.strip())
     if not m:
@@ -125,100 +139,103 @@ def _format_dataframe(
 def flextab_to_string(
     result: "FlextabResult", fmt: str = "{:.3f}", na_rep: str = "."
 ) -> str:
-    """Render a flextab() result as a formatted string.
+    """Render a ``flextab()`` result as a formatted string.
 
     Parameters
     ----------
     result : FlextabResult
-        The DataFrame returned by flextab().
+        Result returned by ``flextab()``.
 
-    fmt : str, default "{:.3f}"
-        Python format string applied to numeric cells that have no
-        per-cell format= spec from the TABLE expression.
-        Examples: "{:.1f}", "{:,.0f}", "{:.2%}"
+    fmt : str
+        Python format string applied to numeric cells without an explicit
+        ``format=`` specification in the TABLE expression.
 
-    na_rep : str, default "."
-        Text shown in place of NaN / missing cells.
+    na_rep : str
+        Text shown in place of missing values.
 
     Returns
     -------
     str
-        A fixed-width string suitable for printing.
+        Fixed-width string representation of the table.
 
     Notes
     -----
-    Per-cell format= specs from the TABLE expression (e.g. *format=7,1
-    or *format=12.0s) take precedence over the fmt parameter for their
-    specific cells.  The fmt parameter acts as the default for any cell
-    without an explicit format= spec.
+    Per-cell ``format=`` specifications from the TABLE expression take
+    precedence over ``fmt``. The ``fmt`` argument therefore acts as the
+    fallback format for cells without an explicit specification.
 
     Examples
     --------
-    print(flextab_to_string(r))                   # default fmt
-    print(flextab_to_string(r, fmt="{:.0f}"))     # 0 decimals everywhere
-    print(flextab_to_string(r, na_rep="-"))       # dash for missing
+    Use the default formatting::
+
+        print(flextab_to_string(r))
+
+    Use zero decimal places::
+
+        print(flextab_to_string(r, fmt="{:.0f}"))
+
+    Display missing values as a dash::
+
+        print(flextab_to_string(r, na_rep="-"))
     """
     return _format_dataframe(result, fmt=fmt, na_rep=na_rep).to_string()
 
 
 def flextab_to_markdown(
-    result: "FlextabResult", fmt: str = "{:.3f}", na_rep: str = ".", sep: str = " / "
+    result: "FlextabResult",
+    fmt: str = "{:.3f}",
+    na_rep: str = ".",
+    sep: str = " / ",
 ) -> str:
-    """Render a flextab() result as a plain Markdown table.
+    """Render a ``flextab()`` result as a plain Markdown table.
 
-    The table contains flattened, human-readable column headers instead of
-    the raw index tuples that pandas' inherited DataFrame.to_markdown()
-    shows for a MultiIndex, and with format= specs from the TABLE expression
-    applied to the numbers.
+    MultiIndex column headers are flattened into readable labels instead of
+    being represented as raw tuples. Explicit ``format=`` specifications from
+    the TABLE expression are applied to numeric values before rendering.
 
-    Standard Markdown tables can't merge cells (no colspan/rowspan) and
-    can't stack more than one header row, so the nested, visually "merged"
-    header layout from the notebook display can't be reproduced in a
-    plain Markdown table - not a flextab limitation, a Markdown one. This
-    function's compromise is to flatten every column's levels into ONE
-    readable label per column: a ('SUM', 'Income') heading becomes
-    "SUM / Income" (see `sep`), and blank levels (e.g. a label suppressed
-    with name='') are dropped rather than left as an empty segment.
-
-    If the exact merged-header look is what you need in a document,
-    embed the HTML rendering instead of a Markdown table - most Markdown
-    processors (GitHub, MkDocs, Jupyter Book, Pandoc) pass raw HTML
-    through untouched, colspan and all:
-
-        with open("table.md", "w") as f:
-            f.write(result._repr_html_())
-
-    (Some renderers, GitHub included, strip inline `style` attributes
-    from embedded HTML for security, so `style=` colouring may not
-    survive - the table structure and merged headers still will.)
+    Markdown does not support merged cells or multiple header rows. MultiIndex
+    column levels are therefore joined into a single label using ``sep``.
+    Empty levels are omitted.
 
     Parameters
     ----------
     result : FlextabResult
-        The DataFrame returned by flextab().
+        Result returned by ``flextab()``.
 
-    fmt : str, default "{:.3f}"
-        Python format string applied to numeric cells that have no
-        per-cell format= spec from the TABLE expression - same behaviour
-        as flextab_to_string().
+    fmt : str
+        Python format string applied to numeric cells without an explicit
+        ``format=`` specification in the TABLE expression.
 
-    na_rep : str, default "."
-        Text shown in place of NaN / missing cells.
+    na_rep : str
+        Text shown in place of missing values.
 
-    sep : str, default " / "
-        Separator used to join a MultiIndex column's levels into one
-        header label.
+    sep : str
+        Separator used to join MultiIndex column levels into a single header
+        label.
 
     Returns
     -------
     str
-        A GitHub-flavoured Markdown table.
+        GitHub-flavoured Markdown representation of the table.
+
+    Notes
+    -----
+    Markdown tables cannot reproduce the merged-header structure used in the
+    HTML representation. For documents that support raw HTML, use
+    ``result._repr_html_()`` when the original multi-level header layout is
+    required.
+
+    Some Markdown renderers may remove inline CSS styling from embedded HTML.
 
     Examples
     --------
-    print(flextab_to_markdown(r))
-    with open("table.md", "w") as f:
-        f.write(flextab_to_markdown(r, na_rep="-"))
+    Render with default settings::
+
+        print(flextab_to_markdown(r))
+
+    Use a dash for missing values::
+
+        print(flextab_to_markdown(r, na_rep="-"))
     """
     formatted = _format_dataframe(result, fmt=fmt, na_rep=na_rep)
 

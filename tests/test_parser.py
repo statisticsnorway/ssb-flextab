@@ -32,6 +32,7 @@ from ssb_flextab.parser import parse_table
 # helpers
 # --------------------------------------------------------------------------
 
+
 def leaf_names(path: list[DimNode]) -> list[str]:
     """Pull the .name off each node in an expanded leaf path."""
     return [n.name for n in path]
@@ -47,6 +48,7 @@ def only_path(node: DimNode) -> list[DimNode]:
 # --------------------------------------------------------------------------
 # "income*mean"
 # --------------------------------------------------------------------------
+
 
 class TestSimpleCross:
     def test_single_dimension_returned(self):
@@ -82,6 +84,7 @@ class TestSimpleCross:
 # "sex, income*MEAN"
 # --------------------------------------------------------------------------
 
+
 class TestTwoDimensionsWithComma:
     def test_comma_splits_into_row_and_column(self):
         row, col = parse_table("sex, income*MEAN")
@@ -112,6 +115,7 @@ class TestTwoDimensionsWithComma:
 # --------------------------------------------------------------------------
 # "(sex region)*income"
 # --------------------------------------------------------------------------
+
 
 class TestGroupCrossedWithMeasure:
     def test_tree_shape(self):
@@ -158,6 +162,7 @@ class TestGroupCrossedWithMeasure:
 # "(sex region)*income*format=9,1s"
 # --------------------------------------------------------------------------
 
+
 class TestFormatSuffixOnLeaf:
     def test_format_attaches_to_preceding_measure_not_a_new_atom(self):
         (root,) = parse_table("(sex region)*income*format=9,1s")
@@ -197,6 +202,7 @@ class TestFormatSuffixOnLeaf:
 # --------------------------------------------------------------------------
 # "(sex region)*pctsum<region>=''*income*format=9,1s"
 # --------------------------------------------------------------------------
+
 
 class TestDenominatorAndSuppressedLabel:
     def test_as_literally_written_this_is_invalid(self):
@@ -240,6 +246,7 @@ class TestDenominatorAndSuppressedLabel:
 # concat ordering.
 # --------------------------------------------------------------------------
 
+
 class TestAllKeywordAndLabels:
     def test_all_keyword_recognized_case_insensitively(self):
         for kw in ("ALL", "all", "TOTAL", "total"):
@@ -275,6 +282,7 @@ class TestAllKeywordAndLabels:
 # _split_dimensions: comma handling incl. the format=W,D decimal comma
 # --------------------------------------------------------------------------
 
+
 class TestSplitDimensions:
     def test_splits_on_top_level_comma(self):
         assert _split_dimensions("sex, income") == ["sex", " income"]
@@ -295,6 +303,7 @@ class TestSplitDimensions:
 # --------------------------------------------------------------------------
 # Invalid expressions
 # --------------------------------------------------------------------------
+
 
 class TestInvalidExpressions:
     def test_empty_string_yields_no_dimensions(self):
@@ -378,6 +387,7 @@ class TestInvalidExpressions:
 # --------------------------------------------------------------------------
 # Tokenizer-level sanity checks (independent of the recursive-descent parser)
 # --------------------------------------------------------------------------
+
 
 class TestTokenize:
     def test_simple_cross_tokens(self):

@@ -7,7 +7,6 @@ import pandas as pd
 
 from .formatting import _parse_fmt_spec
 from .formatting import flextab_to_string
-from .formatting import flextab_to_markdown
 from .parser import DimNode
 from .parser import _classify_path
 from .parser import _expand_node_with_branch
@@ -227,7 +226,7 @@ def flextab(
     data : pd.DataFrame
         Input data.
 
-    measure : str | list | None, default None
+    measure : str | list | None
         Numeric analysis variable name or names (SAS: VAR). A single column
         can be passed as a plain string, for example ``measure="income"``
         instead of ``measure=["income"]``.
@@ -235,12 +234,12 @@ def flextab(
         Omit this argument for count-only tables that use ``N``, ``COUNT``,
         ``SIZE``, or percentage statistics that do not require a measure.
 
-    groupby : str | list | None, default None
+    groupby : str | list | None
         Categorical grouping variable name or names (SAS: CLASS). A single
         column can be passed as a plain string, for example
         ``groupby="origin"`` instead of ``groupby=["origin"]``.
 
-    table : str | None, default None
+    table : str | None
         TABLE expression describing the row and column dimensions.
 
         Basic syntax:
@@ -296,7 +295,7 @@ def flextab(
         which uses a gender subtotal where applicable and ``ALL`` as a
         fallback.
 
-    include_missing_in_groupby : bool, default True
+    include_missing_in_groupby : bool
         Whether missing values in groupby columns should appear as their own
         group level.
 
@@ -304,14 +303,14 @@ def flextab(
         rows with missing values in grouping columns are excluded from the
         corresponding grouping operation.
 
-    fmt : str, default "{:.1f}"
+    fmt : str
         Default Python format string for numeric cells that do not have an
         explicit ``format=`` specification in the TABLE expression.
 
-        This format is used by ``print()``, ``repr()``, and
-        ``flextab_to_string()`` unless overridden there.
+        The default is ``"{:.1f}"``. This format is used by ``print()``,
+        ``repr()``, and ``flextab_to_string()`` unless overridden there.
 
-    na_rep : str | None, default None
+    na_rep : str | None
         Text shown in place of NaN or missing cells, for example ``"-"`` or
         ``"."``.
 
@@ -319,7 +318,7 @@ def flextab(
         preferable when the returned table will be used for further numeric
         operations.
 
-    labels : dict | None, default None
+    labels : dict | None
         Mapping from original groupby values to display labels.
 
         The outer dictionary key is the groupby column name. The inner
@@ -334,10 +333,10 @@ def flextab(
                 "region": {"N": "North", "S": "South"},
             }
 
-    sort_by : str, default "code"
+    sort_by : str
         Controls the order of groupby levels.
 
-        Supported values are:
+        The default is ``"code"``. Supported values are:
 
         - ``"code"``: sort by original data values before label remapping.
         - ``"index"``: sort according to insertion order in the corresponding
@@ -348,7 +347,7 @@ def flextab(
         ``labels``. Columns without a label dictionary are sorted by their
         original values.
 
-    weight : str | None, default None
+    weight : str | None
         Name of a numeric column used as a weight (SAS: WEIGHT statement).
 
         Weight handling follows these rules:
@@ -373,7 +372,7 @@ def flextab(
 
         ``N``, ``COUNT``, ``SIZE``, and ``NMISS`` are never weighted.
 
-    row_header : str | None, default None
+    row_header : str | None
         Name assigned to the row index.
 
         For a flat index, this corresponds to ``result.index.name``. For a
@@ -385,7 +384,7 @@ def flextab(
 
         labels the leftmost index column as ``Region``.
 
-    style : dict | None, default None
+    style : dict | None
         Colour styling applied to notebook display and Excel export.
 
         Colours may be specified as:
@@ -426,7 +425,24 @@ def flextab(
                 "row_header_bg": "#4472C4",
                 "row_header_fg": "white",
                 "cell_bg": ("white", "#EBF3FB"),
-            }
+            }ning the denominator is the subtotal obtained
+          by collapsing that class variable.
+        - ``ALL`` or ``TOTAL``, meaning the grand total.
+
+        When several denominator tokens are supplied, the token matching the
+        current subtable is preferred, with later tokens available as
+        fallbacks.
+
+        Examples include::
+
+            tax*pctsum<income>
+
+        which expresses tax as a percentage of income, and::
+
+            income*pctsum<gender all>
+
+        which uses a gender subtotal where applicable and ``ALL`` as a
+        fallback.
 
     Returns
     -------

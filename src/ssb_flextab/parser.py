@@ -23,9 +23,7 @@ def _tokenize(expr: str) -> list[tuple]:
     for m in pattern.finditer(expr):
         if m.start() != pos:
             invalid = expr[pos : m.start()]
-            raise SyntaxError(
-                f"Unexpected character(s) {invalid!r} at position {pos}"
-            )
+            raise SyntaxError(f"Unexpected character(s) {invalid!r} at position {pos}")
 
         pos = m.end()
 
@@ -50,9 +48,7 @@ def _tokenize(expr: str) -> list[tuple]:
 
     if pos != len(expr):
         invalid = expr[pos:]
-        raise SyntaxError(
-            f"Unexpected character(s) {invalid!r} at position {pos}"
-        )
+        raise SyntaxError(f"Unexpected character(s) {invalid!r} at position {pos}")
 
     cleaned = []
     for token in tokens:
@@ -76,34 +72,40 @@ class DimNode:
     Attributes
     ----------
     kind : str
-        One of:
-          'var'    — a measure or class variable name, or a statistic keyword
-          'all'    — the ALL/TOTAL marginal-total keyword
-          'cross'  — a * b  (children = [a, b])
-          'concat' — a b    (children = [a, b, ...])
-          'group'  — (...)  (children = [inner_node])
+        Node type. Supported values are:
 
-    name : str or None
-        The original token text (uppercased for stat/all keywords).
+        - ``"var"``: a measure or class variable name, or a statistic keyword.
+        - ``"all"``: the ``ALL`` or ``TOTAL`` marginal-total keyword.
+        - ``"cross"``: a crossed expression such as ``a * b``.
+        - ``"concat"``: a concatenated expression such as ``a b``.
+        - ``"group"``: a grouped expression such as ``(...)``.
 
-    label : str or None
-        The display label from name='Label' syntax.
-        None  → use the default (name or 'TOTAL')
-        ''    → suppress the label level in the header entirely
+    name : str | None
+        Original token text. Statistic and ``ALL``/``TOTAL`` keywords are
+        stored in uppercase.
 
-    fmt : str or None
-        Raw format specification string from *format=W.D[_s] syntax,
-        e.g. '7,1' or '12.0s'.  Set by _apply_fmt() and read by
-        _classify_path() to populate spec['fmt'].
+    label : str | None
+        Display label supplied using ``name='Label'`` syntax.
 
-    denom : str or None
-        Denominator definition from PCTN<...> / PCTSUM<...> syntax,
-        e.g. 'income' or 'gender all'.  Read by _classify_path() to
-        populate spec['denom_def'], which routes the cell to
-        _compute_custom_pct().
+        If None, the default label is used. An empty string suppresses the
+        corresponding label level entirely.
 
-    children : list of DimNode
-        Sub-nodes for cross/concat/group kinds.
+    fmt : str | None
+        Raw format specification from ``*format=W.D[_s]`` syntax, for example
+        ``"7,1"`` or ``"12.0s"``.
+
+        The value is used by ``_classify_path()`` when constructing the
+        corresponding table specification.
+
+    denom : str | None
+        Denominator definition from ``PCTN<...>`` or ``PCTSUM<...>`` syntax,
+        for example ``"income"`` or ``"gender all"``.
+
+        The value is used by ``_classify_path()`` when constructing the
+        custom-percentage specification.
+
+    children : list[DimNode]
+        Child nodes for ``cross``, ``concat``, and ``group`` nodes.
     """
 
     kind: str
@@ -160,9 +162,7 @@ class _Parser:
         self._skip_sp()
 
         if self.pos != len(self.tokens):
-            raise SyntaxError(
-                f"Unexpected token: {self.tokens[self.pos]}"
-            )
+            raise SyntaxError(f"Unexpected token: {self.tokens[self.pos]}")
 
         return node
 

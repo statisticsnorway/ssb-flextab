@@ -93,7 +93,7 @@ flextab(data=df, measure="income")
 ```
 
 ```text
- income
+        income
       N   MEAN
     9.0  450.0
 ```
@@ -108,7 +108,7 @@ flextab(data=df, measure="income", groupby="region")
 ```
 
 ```text
-           income
+                  income
                 N   MEAN
 region nan    1.0  300.0
        1      2.0  400.0
@@ -126,7 +126,7 @@ flextab(data=df, measure="income", groupby=["region", "sex"])
 ```
 
 ```text
-           income
+                  income
                 N   MEAN
 region nan    1.0  300.0
        1      2.0  400.0
@@ -145,7 +145,7 @@ flextab(data=df, measure=["income", "tax"], groupby="sex")
 ```
 
 ```text
-        income         tax
+               income         tax
              N   MEAN    N   MEAN
 sex nan    1.0  650.0  1.0  340.0
     1      4.0  362.5  3.0   66.7
@@ -185,7 +185,7 @@ flextab(
 ```
 
 ```text
- region
+                region
     nan    1    2    3
     1.0  2.0  5.0  2.0
 ```
@@ -206,7 +206,7 @@ flextab(
 ```
 
 ```text
- income
+                      income
       N NMISS     SUM   MEAN
     9.0   1.0  4050.0  450.0
 ```
@@ -225,9 +225,9 @@ flextab(
 ```
 
 ```text
- income
- region
-    nan                        1                        2                         3
+                                                                                                 income
+                                                                                                 region
+                        nan                        1                         2                        3
       N NMISS    SUM   MEAN    N NMISS    SUM   MEAN    N NMISS     SUM   MEAN    N NMISS    SUM   MEAN
     1.0   0.0  300.0  300.0  2.0   0.0  800.0  400.0  5.0   0.0  2200.0  440.0  1.0   1.0  750.0  750.0
 ```
@@ -254,7 +254,7 @@ flextab(
 ```
 
 ```text
-            sex
+                      sex
             nan    1    2
 region nan    .  1.0    .
        1      .    .  2.0
@@ -285,7 +285,7 @@ flextab(
 ```
 
 ```text
-                        sex
+                                  sex
                         nan    1    2
 region nan education 3    .  1.0    .
        1   education 2    .    .  1.0
@@ -311,9 +311,9 @@ flextab(
 ```
 
 ```text
-                             sex
-                             nan         1                   2
-                       age_group age_group           age_group
+                                                                     sex
+                             nan                   1                   2
+                       age_group           age_group           age_group
                                1         1    2    3       nan    2    3
 region nan education 3         .         .  1.0    .         .    .    .
        1   education 2         .         .    .    .       1.0    .    .
@@ -342,7 +342,7 @@ flextab(
 ```
 
 ```text
-               sex           age_group
+                         sex                age_group
                nan    1    2       nan    1    2    3
 region    nan    .  1.0    .         .    .  1.0    .
           1      .    .  2.0       1.0    .  1.0    .
@@ -380,18 +380,18 @@ flextab(
 ```text
                                N
                      TOTAL  10.0
-region nan sex       1       1.0
+region nan       sex 1       1.0
            education 3       1.0
-       1   sex       2       2.0
+       1         sex 2       2.0
            education 2       1.0
                      3       1.0
-       2   sex       nan     1.0
+       2         sex nan     1.0
                      1       3.0
                      2       1.0
            education 1       2.0
                      2       1.0
                      3       2.0
-       3   sex       2       2.0
+       3         sex 2       2.0
            education 3       2.0
 ```
 
@@ -452,23 +452,23 @@ flextab(
 ```
 
 ```text
-                                    sex
+                                              sex
                              TOTAL  nan    1    2
        TOTAL           TOTAL  10.0  1.0  4.0  5.0
-             education 1       2.0    .  2.0    .
-                       2       2.0    .  1.0  1.0
-                       3       6.0  1.0  1.0  4.0
+             education     1   2.0    .  2.0    .
+                           2   2.0    .  1.0  1.0
+                           3   6.0  1.0  1.0  4.0
 region nan             TOTAL   1.0    .  1.0    .
-             education 3       1.0    .  1.0    .
-       1               TOTAL   2.0    .    .  2.0
-             education 2       1.0    .    .  1.0
-                       3       1.0    .    .  1.0
-       2               TOTAL   5.0  1.0  3.0  1.0
-             education 1       2.0    .  2.0    .
-                       2       1.0    .  1.0    .
-                       3       2.0  1.0    .  1.0
-       3               TOTAL   2.0    .    .  2.0
-             education 3       2.0    .    .  2.0
+             education     3   1.0    .  1.0    .
+         1             TOTAL   2.0    .    .  2.0
+             education     2   1.0    .    .  1.0
+                           3   1.0    .    .  1.0
+         2             TOTAL   5.0  1.0  3.0  1.0
+             education     1   2.0    .  2.0    .
+                           2   1.0    .  1.0    .
+                           3   2.0  1.0    .  1.0
+         3             TOTAL   2.0    .    .  2.0
+             education     3   2.0    .    .  2.0
 ```
 
 ### Totals with a measure column
@@ -490,15 +490,15 @@ flextab(
 ```
 
 ```text
-                      sex
-                      nan                    1                     2
-                   income               income                income
+                                                                                sex
+                                    nan                     1                     2
+                                 income                income                income
              TOTAL      N    SUM   MEAN      N     SUM   MEAN      N     SUM   MEAN
        TOTAL  10.0    1.0  650.0  650.0    4.0  1450.0  362.5    4.0  1950.0  487.5
-region nan     1.0      .      .      .    1.0   300.0  300.0      .       .      .
-       1       2.0      .      .      .      .       .      .    2.0   800.0  400.0
-       2       5.0    1.0  650.0  650.0    3.0  1150.0  383.3    1.0   400.0  400.0
-       3       2.0      .      .      .      .       .      .    1.0   750.0  750.0
+region   nan   1.0      .      .      .    1.0   300.0  300.0      .       .      .
+           1   2.0      .      .      .      .       .      .    2.0   800.0  400.0
+           2   5.0    1.0  650.0  650.0    3.0  1150.0  383.3    1.0   400.0  400.0
+           3   2.0      .      .      .      .       .      .    1.0   750.0  750.0
 ```
 
 The `TOTAL` column on the left is a plain count (no income statistics).
@@ -519,15 +519,15 @@ flextab(
 ```
 
 ```text
-                                      sex
-              TOTAL                   nan                    1                     2
-             income                income               income                income
+                                                                                                sex
+                             TOTAL                  nan                     1                     2
+                            income               income                income                income
                   N     SUM   MEAN      N    SUM   MEAN      N     SUM   MEAN      N     SUM   MEAN
        TOTAL    9.0  4050.0  450.0    1.0  650.0  650.0    4.0  1450.0  362.5    4.0  1950.0  487.5
-region nan      1.0   300.0  300.0      .      .      .    1.0   300.0  300.0      .       .      .
-       1        2.0   800.0  400.0      .      .      .      .       .      .    2.0   800.0  400.0
-       2        5.0  2200.0  440.0    1.0  650.0  650.0    3.0  1150.0  383.3    1.0   400.0  400.0
-       3        1.0   750.0  750.0      .      .      .      .       .      .    1.0   750.0  750.0
+region   nan    1.0   300.0  300.0      .      .      .    1.0   300.0  300.0      .       .      .
+           1    2.0   800.0  400.0      .      .      .      .       .      .    2.0   800.0  400.0
+           2    5.0  2200.0  440.0    1.0  650.0  650.0    3.0  1150.0  383.3    1.0   400.0  400.0
+           3    1.0   750.0  750.0      .      .      .      .       .      .    1.0   750.0  750.0
 ```
 
 ## Statistics reference
@@ -548,13 +548,13 @@ flextab(
 ```
 
 ```text
-             income
+                                                                                                                       income
                   N NMISS  SIZE     SUM MEDIAN   MEAN  GMEAN  HMEAN    MIN    MAX    STD STDERR      VAR     P1    P99 QRANGE
        TOTAL    9.0   1.0  10.0  4050.0  400.0  450.0  377.8  300.4  100.0  850.0  252.5   84.2  63750.0  108.0  842.0  350.0
-region nan      1.0   0.0   1.0   300.0  300.0  300.0  300.0  300.0  300.0  300.0      .      .        .  300.0  300.0    0.0
-       1        2.0   0.0   2.0   800.0  400.0  400.0  396.9  393.8  350.0  450.0   70.7   50.0   5000.0  351.0  449.0   50.0
-       2        5.0   0.0   5.0  2200.0  400.0  440.0  338.1  247.3  100.0  850.0  311.0  139.1  96750.0  104.0  842.0  450.0
-       3        1.0   1.0   2.0   750.0  750.0  750.0  750.0  750.0  750.0  750.0      .      .        .  750.0  750.0    0.0
+region   nan    1.0   0.0   1.0   300.0  300.0  300.0  300.0  300.0  300.0  300.0      .      .        .  300.0  300.0    0.0
+           1    2.0   0.0   2.0   800.0  400.0  400.0  396.9  393.8  350.0  450.0   70.7   50.0   5000.0  351.0  449.0   50.0
+           2    5.0   0.0   5.0  2200.0  400.0  440.0  338.1  247.3  100.0  850.0  311.0  139.1  96750.0  104.0  842.0  450.0
+           3    1.0   1.0   2.0   750.0  750.0  750.0  750.0  750.0  750.0  750.0      .      .        .  750.0  750.0    0.0
 ```
 
 | Statistic | Meaning |
@@ -598,23 +598,23 @@ flextab(
 ```
 
 ```text
-                       region
+                                               region
                  TOTAL    nan       1        2      3
-income N           9.0    1.0     2.0      5.0    1.0
-       NMISS       1.0    0.0     0.0      0.0    1.0
-       SIZE       10.0    1.0     2.0      5.0    2.0
-       SUM      4050.0  300.0   800.0   2200.0  750.0
+income      N      9.0    1.0     2.0      5.0    1.0
+        NMISS      1.0    0.0     0.0      0.0    1.0
+         SIZE     10.0    1.0     2.0      5.0    2.0
+          SUM   4050.0  300.0   800.0   2200.0  750.0
        MEDIAN    400.0  300.0   400.0    400.0  750.0
-       MEAN      450.0  300.0   400.0    440.0  750.0
-       GMEAN     377.8  300.0   396.9    338.1  750.0
-       HMEAN     300.4  300.0   393.8    247.3  750.0
-       MIN       100.0  300.0   350.0    100.0  750.0
-       MAX       850.0  300.0   450.0    850.0  750.0
-       STD       252.5      .    70.7    311.0      .
+         MEAN    450.0  300.0   400.0    440.0  750.0
+        GMEAN    377.8  300.0   396.9    338.1  750.0
+        HMEAN    300.4  300.0   393.8    247.3  750.0
+          MIN    100.0  300.0   350.0    100.0  750.0
+          MAX    850.0  300.0   450.0    850.0  750.0
+          STD    252.5      .    70.7    311.0      .
        STDERR     84.2      .    50.0    139.1      .
-       VAR     63750.0      .  5000.0  96750.0      .
-       P1        108.0  300.0   351.0    104.0  750.0
-       P99       842.0  300.0   449.0    842.0  750.0
+          VAR  63750.0      .  5000.0  96750.0      .
+           P1    108.0  300.0   351.0    104.0  750.0
+          P99    842.0  300.0   449.0    842.0  750.0
        QRANGE    350.0    0.0    50.0    450.0    0.0
 ```
 
@@ -639,25 +639,25 @@ flextab(
 ```
 
 ```text
-                       region
+                                                 region
                  TOTAL    nan       1         2       3
-income N           8.0    1.0     2.0       4.0     1.0
-       NMISS       1.0    0.0     0.0       0.0     1.0
-       SIZE        9.0    1.0     2.0       4.0     2.0
-       SUM     16040.0  450.0  3635.0    8805.0  3150.0
+income      N      8.0    1.0     2.0       4.0     1.0
+        NMISS      1.0    0.0     0.0       0.0     1.0
+         SIZE      9.0    1.0     2.0       4.0     2.0
+          SUM  16040.0  450.0  3635.0    8805.0  3150.0
        MEDIAN    450.0  300.0   350.0     650.0   750.0
-       MEAN      502.8  300.0   367.2     540.2   750.0
-       GMEAN     425.0  300.0   365.4     415.5   750.0
-       HMEAN     332.9  300.0   363.9     280.9   750.0
-       MIN       100.0  300.0   350.0     100.0   750.0
-       MAX       850.0  300.0   450.0     850.0   750.0
-       STD       269.9      .    70.7     347.3       .
+         MEAN    502.8  300.0   367.2     540.2   750.0
+        GMEAN    425.0  300.0   365.4     415.5   750.0
+        HMEAN    332.9  300.0   363.9     280.9   750.0
+          MIN    100.0  300.0   350.0     100.0   750.0
+          MAX    850.0  300.0   450.0     850.0   750.0
+          STD    269.9      .    70.7     347.3       .
        STDERR     47.8      .    22.5      86.0       .
-       VAR     72847.8      .  5000.0  120642.7       .
-       P1        100.0  300.0   350.0     100.0   750.0
-       P25       350.0  300.0   350.0     200.0   750.0
-       P75       750.0  300.0   350.0     850.0   750.0
-       P99       850.0  300.0   450.0     850.0   750.0
+          VAR  72847.8      .  5000.0  120642.7       .
+           P1    100.0  300.0   350.0     100.0   750.0
+          P25    350.0  300.0   350.0     200.0   750.0
+          P75    750.0  300.0   350.0     850.0   750.0
+          P99    850.0  300.0   450.0     850.0   750.0
        QRANGE    400.0    0.0     0.0     650.0     0.0
 ```
 
@@ -713,10 +713,10 @@ flextab(
               TOTAL income   nan income     1 income     2 income
                PCTN PCTSUM  PCTN PCTSUM  PCTN PCTSUM  PCTN PCTSUM
        TOTAL  100.0  100.0  10.0   16.0  40.0   35.8  50.0   48.1
-region nan     10.0    7.4     .      .  10.0    7.4     .      .
-       1       20.0   19.8     .      .     .      .  20.0   19.8
-       2       50.0   54.3  10.0   16.0  30.0   28.4  10.0    9.9
-       3       20.0   18.5     .      .     .      .  20.0   18.5
+region   nan     10.0    7.4     .      .  10.0    7.4     .      .
+           1   20.0   19.8     .      .     .      .  20.0   19.8
+           2   50.0   54.3  10.0   16.0  30.0   28.4  10.0    9.9
+           3   20.0   18.5     .      .     .      .  20.0   18.5
 ```
 
 ### Row and column percentages
@@ -735,15 +735,15 @@ flextab(
 ```
 
 ```text
-                                            income
-             ROWPCTN                     ROWPCTSUM
-                       sex                           sex
+                                                                income
+                                 ROWPCTN                     ROWPCTSUM
+                                     sex                           sex
                TOTAL   nan      1      2     TOTAL   nan      1      2
        TOTAL   100.0  10.0   40.0   50.0     100.0  16.0   35.8   48.1
-region nan     100.0     .  100.0      .     100.0     .  100.0      .
-       1       100.0     .      .  100.0     100.0     .      .  100.0
-       2       100.0  20.0   60.0   20.0     100.0  29.5   52.3   18.2
-       3       100.0     .      .  100.0     100.0     .      .  100.0
+region   nan   100.0     .  100.0      .     100.0     .  100.0      .
+           1   100.0     .      .  100.0     100.0     .      .  100.0
+           2   100.0  20.0   60.0   20.0     100.0  29.5   52.3   18.2
+           3   100.0     .      .  100.0     100.0     .      .  100.0
 ```
 
 ```python
@@ -760,15 +760,15 @@ flextab(
 ```
 
 ```text
-                                             income
-             COLPCTN                      COLPCTSUM
-                        sex                            sex
+                                                                  income
+                                  COLPCTN                      COLPCTSUM
+                                      sex                            sex
                TOTAL    nan      1      2     TOTAL    nan      1      2
        TOTAL   100.0  100.0  100.0  100.0     100.0  100.0  100.0  100.0
-region nan      10.0      .   25.0      .       7.4      .   20.7      .
-       1        20.0      .      .   40.0      19.8      .      .   41.0
-       2        50.0  100.0   75.0   20.0      54.3  100.0   79.3   20.5
-       3        20.0      .      .   40.0      18.5      .      .   38.5
+region   nan    10.0      .   25.0      .       7.4      .   20.7      .
+           1    20.0      .      .   40.0      19.8      .      .   41.0
+           2    50.0  100.0   75.0   20.0      54.3  100.0   79.3   20.5
+           3    20.0      .      .   40.0      18.5      .      .   38.5
 ```
 
 Percentages respect `weight=` too, just like any other statistic:
@@ -788,15 +788,15 @@ flextab(
 ```
 
 ```text
-                                             income
-             COLPCTN                      COLPCTSUM
-                        sex                            sex
+                                                                  income
+                                  COLPCTN                      COLPCTSUM
+                                      sex                            sex
                TOTAL    nan      1      2     TOTAL    nan      1      2
        TOTAL   100.0  100.0  100.0  100.0     100.0  100.0  100.0  100.0
-region nan      11.1      .   25.0      .       2.8      .    8.5      .
-       1        22.2      .      .   50.0      22.7      .      .   53.6
-       2        44.4  100.0   75.0      .      54.9  100.0   91.5      .
-       3        22.2      .      .   50.0      19.6      .      .   46.4
+region   nan    11.1      .   25.0      .       2.8      .    8.5      .
+           1    22.2      .      .   50.0      22.7      .      .   53.6
+           2    44.4  100.0   75.0      .      54.9  100.0   91.5      .
+           3    22.2      .      .   50.0      19.6      .      .   46.4
 ```
 
 ### Custom denominators
@@ -821,23 +821,23 @@ flextab(
 ```
 
 ```text
-                              education
+                                            education
                         TOTAL         1      2      3
                          PCTN      PCTN   PCTN   PCTN
     TOTAL        TOTAL  100.0     100.0  100.0  100.0
-          region nan     10.0         .      .   16.7
-                 1       20.0         .   50.0   16.7
-                 2       50.0     100.0   50.0   33.3
-                 3       20.0         .      .   33.3
+          region   nan   10.0         .      .   16.7
+                     1   20.0         .   50.0   16.7
+                     2   50.0     100.0   50.0   33.3
+                     3   20.0         .      .   33.3
 sex nan          TOTAL  100.0         .      .  100.0
-          region 2      100.0         .      .  100.0
-    1            TOTAL  100.0     100.0  100.0  100.0
-          region nan     25.0         .      .  100.0
-                 2       75.0     100.0  100.0      .
-    2            TOTAL  100.0         .  100.0  100.0
-          region 1       40.0         .  100.0   25.0
-                 2       20.0         .      .   25.0
-                 3       40.0         .      .   50.0
+          region     2  100.0         .      .  100.0
+      1          TOTAL  100.0     100.0  100.0  100.0
+          region   nan   25.0         .      .  100.0
+                     2   75.0     100.0  100.0      .
+      2          TOTAL  100.0         .  100.0  100.0
+          region     1   40.0         .  100.0   25.0
+                     2   20.0         .      .   25.0
+                     3   40.0         .      .   50.0
 ```
 
 **A measure column as denominator.** Here `tax` is expressed as a
@@ -858,13 +858,13 @@ flextab(
 ```
 
 ```text
-                 SUM         PCTSUM
+                         SUM PCTSUM
               income     tax    tax
        TOTAL  4050.0  1440.0   35.6
-region nan     300.0   100.0   33.3
-       1       800.0   350.0   43.8
-       2      2200.0   590.0   26.8
-       3       750.0   400.0   53.3
+region   nan   300.0   100.0   33.3
+           1   800.0   350.0   43.8
+           2  2200.0   590.0   26.8
+           3   750.0   400.0   53.3
 ```
 
 ## Formatting numbers
@@ -890,13 +890,13 @@ flextab(
 ```
 
 ```text
-                SUM        PCTSUM
+                       SUM PCTSUM
              income    tax    tax
        TOTAL  4,050  1,440   35.6
-region nan      300    100   33.3
-       1        800    350   43.8
-       2      2,200    590   26.8
-       3        750    400   53.3
+region   nan    300    100   33.3
+           1    800    350   43.8
+           2  2,200    590   26.8
+           3    750    400   53.3
 ```
 
 **European style — decimal comma, and `s` for a space thousands
@@ -916,13 +916,13 @@ flextab(
 ```
 
 ```text
-                SUM        PCTSUM
+                       SUM PCTSUM
              income    tax    tax
        TOTAL  4 050  1 440   35,6
-region nan      300    100   33,3
-       1        800    350   43,8
-       2      2 200    590   26,8
-       3        750    400   53,3
+region   nan    300    100   33,3
+           1    800    350   43,8
+           2  2 200    590   26,8
+           3    750    400   53,3
 ```
 
 ### Formatting several statistics at once
@@ -939,7 +939,7 @@ flextab(
 ```
 
 ```text
- income
+        income
    MEAN  GMEAN
   450,0  377,8
 ```
@@ -959,12 +959,12 @@ flextab(data=df, groupby="region", measure="income", fmt="{:.2f}")
 ```
 
 ```text
-           income
+                   income
                 N    MEAN
 region nan   1.00  300.00
-       1     2.00  400.00
-       2     5.00  440.00
-       3     1.00  750.00
+         1   2.00  400.00
+         2   5.00  440.00
+         3   1.00  750.00
 ```
 
 ## Changing or hiding labels
@@ -990,11 +990,11 @@ flextab(
 ```text
        Income    Tax Tax %
 Region
-TOTAL   4 050  1 440  35,6
-nan       300    100  33,3
-1         800    350  43,8
-2       2 200    590  26,8
-3         750    400  53,3
+ TOTAL  4 050  1 440  35,6
+   nan    300    100  33,3
+     1    800    350  43,8
+     2  2 200    590  26,8
+     3    750    400  53,3
 ```
 
 `row_header=` names the row index itself — here it turns the blank corner
@@ -1024,10 +1024,10 @@ flextab(
 ```text
        Income    Tax Tax %
 Region
-TOTAL   4 050  1 440  35,6
-1         800    350  43,8
-2       2 200    590  26,8
-3         750    400  53,3
+ TOTAL  4 050  1 440  35,6
+     1    800    350  43,8
+     2  2 200    590  26,8
+     3    750    400  53,3
 ```
 
 Note this only controls *rows built from missing groupby values* — it has
@@ -1060,11 +1060,11 @@ flextab(
 
 ```text
                    TOTAL   nan  West   East Central
-Education
-TOTAL              100,0   7,4  19,8   54,3    18,5
+        Education
+            TOTAL  100,0   7,4  19,8   54,3    18,5
 Elementary school  100,0     .     .  100,0       .
-Secondary school   100,0     .  77,8   22,2       .
-Higher education   100,0  11,8  17,6   41,2    29,4
+ Secondary school  100,0     .  77,8   22,2       .
+ Higher education  100,0  11,8  17,6   41,2    29,4
 ```
 
 ### `sort_by`
@@ -1094,11 +1094,11 @@ flextab(
 
 ```text
                    TOTAL Central   East  West   nan
-Education
-TOTAL              100,0    18,5   54,3  19,8   7,4
+        Education
+            TOTAL  100,0    18,5   54,3  19,8   7,4
 Elementary school  100,0       .  100,0     .     .
-Higher education   100,0    29,4   41,2  17,6  11,8
-Secondary school   100,0       .   22,2  77,8     .
+ Higher education  100,0    29,4   41,2  17,6  11,8
+ Secondary school  100,0       .   22,2  77,8     .
 ```
 
 ```python
@@ -1119,10 +1119,10 @@ flextab(
 
 ```text
                    TOTAL  West   East Central   nan
-Education
-TOTAL              100,0  19,8   54,3    18,5   7,4
-Higher education   100,0  17,6   41,2    29,4  11,8
-Secondary school   100,0  77,8   22,2       .     .
+        Education
+            TOTAL  100,0  19,8   54,3    18,5   7,4
+ Higher education  100,0  17,6   41,2    29,4  11,8
+ Secondary school  100,0  77,8   22,2       .     .
 Elementary school  100,0     .  100,0       .     .
 ```
 
@@ -1160,10 +1160,10 @@ flextab(
 
 ```text
                    TOTAL  West   East Central   nan
-Education
-TOTAL              100,0  19,8   54,3    18,5   7,4
-Higher education   100,0  17,6   41,2    29,4  11,8
-Secondary school   100,0  77,8   22,2       -     -
+        Education
+            TOTAL  100,0  19,8   54,3    18,5   7,4
+ Higher education  100,0  17,6   41,2    29,4  11,8
+ Secondary school  100,0  77,8   22,2       -     -
 Elementary school  100,0     -  100,0       -     -
 ```
 
@@ -1186,10 +1186,11 @@ tab.sum().sum()
 ```
 
 ```text
-10.0
+np.float64(10.0)
 ```
 
 ```python
+from ssb_flextab.formatting import flextab_to_string
 print(flextab_to_string(tab, na_rep="MISSING"))
 ```
 
@@ -1251,12 +1252,12 @@ flextab(
 ```
 
 ```text
-                     SUM
+                            SUM
                   Income    Tax Tax %
-Education
-TOTAL              4 050  1 440  35,6
-Higher education   2 550  1 190  46,7
-Secondary school     450    160  35,6
+        Education
+            TOTAL  4 050  1 440  35,6
+ Higher education  2 550  1 190  46,7
+ Secondary school    450    160  35,6
 Elementary school  1 050     90   8,6
 ```
 
@@ -1285,7 +1286,7 @@ tab["SUM"].sum()
 ```
 
 ```text
-4050.0
+np.float64(4050.0)
 ```
 
 (The one exception is if you pass `na_rep=` to `flextab()` itself — see
@@ -1337,7 +1338,7 @@ tab = flextab(
     style=tabstyle
 )
 
-excel_filename = "../reports/tab1.xlsx"
+excel_filename = "tab1.xlsx"
 tab.to_excel(excel_filename)
 ```
 
@@ -1379,6 +1380,7 @@ does, and flattens each column's levels into one readable label joined
 by `sep` (default `" / "`), dropping blank levels along the way:
 
 ```python
+from ssb_flextab.formatting import flextab_to_markdown
 flextab_to_markdown(tab)
 ```
 
@@ -1403,7 +1405,7 @@ Most Markdown processors (GitHub, GitLab, MkDocs, Jupyter Book, Pandoc)
 pass raw HTML straight through untouched:
 
 ```python
-markdown_filename = "../reports/tab1.md"
+markdown_filename = "tab1.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab._repr_html_())
 ```

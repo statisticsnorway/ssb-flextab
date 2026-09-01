@@ -561,7 +561,13 @@ flextab(
 )
 
 # %% [markdown]
-# We can export the table to different formats, like excel or markdown. Here is an example on export to excel.
+# We can export the table to different formats, like excel or markdown. 
+#
+# Beware that output tables may contain sensitive data. Don't save output tables 
+# to a github repository. In the examples below they are stored in the working directory. 
+# Change the directory to a placement outside the repository before you export tables to external files.
+#
+# Here is an example on export to excel.
 
 # %%
 tab = flextab(
@@ -580,7 +586,7 @@ tab = flextab(
     style=tabstyle,
 )
 
-excel_filename = "../reports/tab1.xlsx"
+excel_filename = "tab1.xlsx"
 
 tab.to_excel(excel_filename)
 
@@ -606,7 +612,7 @@ tab = flextab(
 
 tab_md = tab.to_markdown()
 
-markdown_filename = "../reports/tab1.md"
+markdown_filename = "tab1.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab_md)
 

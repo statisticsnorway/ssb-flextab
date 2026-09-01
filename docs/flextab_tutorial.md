@@ -12,6 +12,8 @@ one-line call to styled, exportable tables.
 import pandas as pd
 
 from ssb_flextab import flextab
+from ssb_flextab.formatting import flextab_to_string
+from ssb_flextab.formatting import flextab_to_markdown
 ```
 
 ## The data set
@@ -1190,7 +1192,6 @@ np.float64(10.0)
 ```
 
 ```python
-from ssb_flextab.formatting import flextab_to_string
 print(flextab_to_string(tab, na_rep="MISSING"))
 ```
 
@@ -1315,6 +1316,10 @@ table looks in a notebook.
 
 ## Exporting
 
+Beware that output tables may contain sensitive data. Don't save output tables 
+to a github repository. In the examples below they are stored in the working directory. 
+Change the directory to a placement outside the repository before you export tables to external files.
+
 ### To Excel
 
 `FlextabResult` is a `pd.DataFrame` subclass, so it carries a `to_excel()`
@@ -1380,7 +1385,6 @@ does, and flattens each column's levels into one readable label joined
 by `sep` (default `" / "`), dropping blank levels along the way:
 
 ```python
-from ssb_flextab.formatting import flextab_to_markdown
 flextab_to_markdown(tab)
 ```
 

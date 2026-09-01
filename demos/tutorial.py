@@ -1,5 +1,7 @@
 # %% [markdown]
 # # Flextab Tutorial
+# Below are some examples on how to use `flextab` for creating different 
+# kind of statistical tables.
 
 # %%
 from pprint import pprint

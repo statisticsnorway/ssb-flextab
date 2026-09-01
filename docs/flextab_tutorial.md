@@ -1,8 +1,13 @@
 # Flextab Tutorial
 
-`flextab` is a Python function that builds cross-tabulations the way SAS's
-`PROC TABULATE` does — statistics crossed with categorical breakdowns, laid
-out with a compact table expression instead of pivot-table boilerplate.
+`flextab` is a Python function that builds cross-tabulations inspired by 
+the way SAS's `PROC TABULATE` does — statistics crossed with categorical 
+breakdowns, laid out with a compact table expression instead of pivot-table 
+boilerplate.
+
+`flextab` is made for working on Pandas dataframes.
+It can make flexible tables in one or two dimensions. 
+
 This tutorial walks through it feature by feature, from the simplest
 one-line call to styled, exportable tables.
 

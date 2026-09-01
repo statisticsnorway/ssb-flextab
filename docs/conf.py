@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath("../src"))
 # -- Project information -----------------------------------------------------
 
 project = "SSB flextab"
-copyright = "2026, Kristian LØønø"
+copyright = "2026, Kristian Lønø"
 author = "Kristian Lønø"
 
 # -- General configuration ---------------------------------------------------

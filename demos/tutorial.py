@@ -625,3 +625,32 @@ with open(markdown_filename, "w", encoding="utf-8") as f:
 markdown_filename = "tab1b.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab._repr_html_())
+
+# %% [markdown]
+# Loop to make table for each unique value for a column, but first a table for the total
+
+# %%
+sex_list = ["Total"] + df["sex"].unique().tolist()
+
+for s, r in zip(sex_list, range(0,len(sex_list)+1)):
+    if r == 0:
+        rows = df
+        print(f"\nTable 1: Education and region. Total")
+    else:    
+        if pd.isna(s):
+            rows = df[df["sex"].isna()]
+        else:
+            rows = df[df["sex"] == s]
+        print(f"\nTable 1.{r}: Education and region. {labels["sex"].get(s, "Unknown sex")}.")
+    print(flextab(
+    data=rows,
+    groupby=["education", "region"],
+    measure=["income", "tax"],
+    table="""
+    (total education='') * (total region='')
+    ,
+    sum * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
+    """,
+    labels=labels,
+    sort_by="index"
+    ))

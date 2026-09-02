@@ -1305,7 +1305,7 @@ whatever `.attrs` the object carries), you can render the *same* result
 with different settings any time, without rebuilding the table:
 
 ```python
-flextab_to_string(tab, fmt="{:.0f}", na_rep="n/a")
+print(flextab_to_string(tab, fmt="{:.0f}", na_rep="n/a"))
 ```
 
 ```text
@@ -1334,10 +1334,10 @@ any `style=` colours are preserved in the output file:
 ```python
 tab = flextab(
     data=df,
-    groupby="education",
+    groupby=["education", "sex"],
     measure=["income", "tax"],
     table="""
-    (total education='')
+    (total education='') * (total sex='')
     ,
     sum * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
@@ -1358,16 +1358,23 @@ Because it's a plain DataFrame under the hood, the standard
 `.to_markdown()` also works — but it's not flextab-aware:
 
 ```python
-tab.to_markdown()
+print(tab.to_markdown())
 ```
 
 ```text
-| Education         |   ('SUM', 'Income') |   ('SUM', 'Tax') |   ('', 'Tax %') |
-|:------------------|---------------------:|------------------:|-----------------:|
-| TOTAL             |                 4050 |              1440 |         35.5556  |
-| Higher education  |                 2550 |              1190 |         46.6667  |
-| Secondary school  |                  450 |               160 |         35.5556  |
-| Elementary school |                 1050 |                90 |          8.57143 |
+|                                 |   ('SUM', 'Income') |   ('SUM', 'Tax') |   ('', 'Tax %') |
+|:--------------------------------|--------------------:|-----------------:|----------------:|
+| ('TOTAL', 'TOTAL')              |                4050 |             1440 |        35.5556  |
+| ('TOTAL', 'Males')              |                1450 |              200 |        13.7931  |
+| ('TOTAL', 'Females')            |                1950 |              900 |        46.1538  |
+| ('Higher education', 'TOTAL')   |                2550 |             1190 |        46.6667  |
+| ('Higher education', 'Males')   |                 300 |              100 |        33.3333  |
+| ('Higher education', 'Females') |                1600 |              750 |        46.875   |
+| ('Secondary school', 'TOTAL')   |                 450 |              160 |        35.5556  |
+| ('Secondary school', 'Males')   |                 100 |               10 |        10       |
+| ('Secondary school', 'Females') |                 350 |              150 |        42.8571  |
+| ('Elementary school', 'TOTAL')  |                1050 |               90 |         8.57143 |
+| ('Elementary school', 'Males')  |                1050 |               90 |         8.57143 |
 ```
 
 Two problems: it prints raw column-header tuples like `('SUM', 'Income')`
@@ -1390,16 +1397,23 @@ does, and flattens each column's levels into one readable label joined
 by `sep` (default `" / "`), dropping blank levels along the way:
 
 ```python
-flextab_to_markdown(tab)
+print(flextab_to_markdown(tab))
 ```
 
 ```text
-| Education | SUM / Income | SUM / Tax | Tax % |
-|---|---|---|---|
-| TOTAL | 4 050 | 1 440 | 35,6 |
-| Higher education | 2 550 | 1 190 | 46,7 |
-| Secondary school | 450 | 160 | 35,6 |
-| Elementary school | 1 050 | 90 | 8,6 |
+| Education |  | SUM / Income | SUM / Tax | Tax % |
+|---|---|---|---|---|
+| TOTAL | TOTAL | 4 050 | 1 440 | 35,6 |
+| TOTAL | Males | 1 450 | 200 | 13,8 |
+| TOTAL | Females | 1 950 | 900 | 46,2 |
+| Higher education | TOTAL | 2 550 | 1 190 | 46,7 |
+| Higher education | Males | 300 | 100 | 33,3 |
+| Higher education | Females | 1 600 | 750 | 46,9 |
+| Secondary school | TOTAL | 450 | 160 | 35,6 |
+| Secondary school | Males | 100 | 10 | 10,0 |
+| Secondary school | Females | 350 | 150 | 42,9 |
+| Elementary school | TOTAL | 1 050 | 90 | 8,6 |
+| Elementary school | Males | 1 050 | 90 | 8,6 |
 ```
 
 That's a real Markdown table — it'll render correctly anywhere, and the

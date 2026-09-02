@@ -622,6 +622,6 @@ with open(markdown_filename, "w", encoding="utf-8") as f:
 # When we use `_repr_html`, the table will be rendered as html and the layout will be kept.
 
 # %%
-markdown_filename = "../reports/tab1b.md"
+markdown_filename = "tab1b.md"
 with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab._repr_html_())

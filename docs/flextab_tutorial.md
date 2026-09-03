@@ -118,9 +118,9 @@ flextab(data=df, measure="income", groupby="region")
                   income
                 N   MEAN
 region nan    1.0  300.0
-       1      2.0  400.0
-       2      5.0  440.0
-       3      1.0  750.0
+         1    2.0  400.0
+         2    5.0  440.0
+         3    1.0  750.0
 ```
 
 ### Several `groupby` columns
@@ -136,12 +136,12 @@ flextab(data=df, measure="income", groupby=["region", "sex"])
                   income
                 N   MEAN
 region nan    1.0  300.0
-       1      2.0  400.0
-       2      5.0  440.0
-       3      1.0  750.0
+         1    2.0  400.0
+         2    5.0  440.0
+         3    1.0  750.0
 sex    nan    1.0  650.0
-       1      4.0  362.5
-       2      4.0  487.5
+         1    4.0  362.5
+         2    4.0  487.5
 ```
 
 This also works with several measure columns at once — each gets its own
@@ -155,8 +155,8 @@ flextab(data=df, measure=["income", "tax"], groupby="sex")
                income         tax
              N   MEAN    N   MEAN
 sex nan    1.0  650.0  1.0  340.0
-    1      4.0  362.5  3.0   66.7
-    2      4.0  487.5  5.0  180.0
+      1    4.0  362.5  3.0   66.7
+      2    4.0  487.5  5.0  180.0
 ```
 
 ## The `table` argument
@@ -264,9 +264,9 @@ flextab(
                       sex
             nan    1    2
 region nan    .  1.0    .
-       1      .    .  2.0
-       2    1.0  3.0  1.0
-       3      .    .  2.0
+         1    .    .  2.0
+         2  1.0  3.0  1.0
+         3    .    .  2.0
 ```
 
 `region` is now the rows, `sex` the columns, and each cell is the count of
@@ -352,12 +352,12 @@ flextab(
                          sex                age_group
                nan    1    2       nan    1    2    3
 region    nan    .  1.0    .         .    .  1.0    .
-          1      .    .  2.0       1.0    .  1.0    .
-          2    1.0  3.0  1.0         .  2.0  1.0  2.0
-          3      .    .  2.0         .    .  2.0    .
-education 1      .  2.0    .         .    .  1.0  1.0
-          2      .  1.0  1.0       1.0  1.0    .    .
-          3    1.0  1.0  4.0         .  1.0  4.0  1.0
+            1    .    .  2.0       1.0    .  1.0    .
+            2  1.0  3.0  1.0         .  2.0  1.0  2.0
+            3    .    .  2.0         .    .  2.0    .
+education   1    .  2.0    .         .    .  1.0  1.0
+            2    .  1.0  1.0       1.0  1.0    .    .
+            3  1.0  1.0  4.0         .  1.0  4.0  1.0
 ```
 
 Now `region` and `education` each get their own independent breakdown in
@@ -387,19 +387,19 @@ flextab(
 ```text
                                N
                      TOTAL  10.0
-region nan       sex 1       1.0
-           education 3       1.0
-       1         sex 2       2.0
-           education 2       1.0
-                     3       1.0
-       2         sex nan     1.0
-                     1       3.0
-                     2       1.0
-           education 1       2.0
-                     2       1.0
-                     3       2.0
-       3         sex 2       2.0
-           education 3       2.0
+region nan       sex     1   1.0
+           education     3   1.0
+         1       sex     2   2.0
+           education     2   1.0
+                         3   1.0
+         2       sex   nan   1.0
+                         1   3.0
+                         2   1.0
+           education     1   2.0
+                         2   1.0
+                         3   2.0
+         3       sex     2   2.0
+           education     3   2.0
 ```
 
 ### Nested totals give subtotals
@@ -420,20 +420,20 @@ flextab(
 ```
 
 ```text
-                                  sex
+                                            sex
                            TOTAL  nan    1    2
                      TOTAL  10.0  1.0  4.0  5.0
 region nan           TOTAL   1.0    .  1.0    .
-           education 3       1.0    .  1.0    .
-       1             TOTAL   2.0    .    .  2.0
-           education 2       1.0    .    .  1.0
-                     3       1.0    .    .  1.0
-       2             TOTAL   5.0  1.0  3.0  1.0
-           education 1       2.0    .  2.0    .
-                     2       1.0    .  1.0    .
-                     3       2.0  1.0    .  1.0
-       3             TOTAL   2.0    .    .  2.0
-           education 3       2.0    .    .  2.0
+           education     3   1.0    .  1.0    .
+         1           TOTAL   2.0    .    .  2.0
+           education     2   1.0    .    .  1.0
+                         3   1.0    .    .  1.0
+         2           TOTAL   5.0  1.0  3.0  1.0
+           education     1   2.0    .  2.0    .
+                         2   1.0    .  1.0    .
+                         3   2.0  1.0    .  1.0
+         3           TOTAL   2.0    .    .  2.0
+           education     3   2.0    .    .  2.0
 ```
 
 Each region row now gets its own `TOTAL` sub-row, in addition to the
@@ -709,21 +709,21 @@ flextab(
     table="""
     total region
     ,
-    (total sex) * (pctn income*pctsum)
+    (pctn income*pctsum) * (total sex)
     """
 )
 ```
 
 ```text
-                                    sex          sex          sex
-                     TOTAL          nan            1            2
-              TOTAL income   nan income     1 income     2 income
-               PCTN PCTSUM  PCTN PCTSUM  PCTN PCTSUM  PCTN PCTSUM
-       TOTAL  100.0  100.0  10.0   16.0  40.0   35.8  50.0   48.1
-region   nan     10.0    7.4     .      .  10.0    7.4     .      .
-           1   20.0   19.8     .      .     .      .  20.0   19.8
-           2   50.0   54.3  10.0   16.0  30.0   28.4  10.0    9.9
-           3   20.0   18.5     .      .     .      .  20.0   18.5
+                                                        income                  
+                                 PCTN                   PCTSUM                  
+                                  sex                      sex            
+              TOTAL   nan     1     2  TOTAL   nan     1     2
+       TOTAL  100.0  10.0  40.0  50.0  100.0  16.0  35.8  48.1
+region   nan   10.0     .  10.0     .    7.4     .   7.4     .
+           1   20.0     .     .  20.0   19.8     .     .  19.8
+           2   50.0  10.0  30.0  10.0   54.3  16.0  28.4   9.9
+           3   20.0     .     .  20.0   18.5     .     .  18.5           
 ```
 
 ### Row and column percentages

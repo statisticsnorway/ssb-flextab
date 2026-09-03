@@ -74,7 +74,7 @@ flextab(
     groupby="region",
     table="""
     region
-    """,
+    """
 )
 
 # %% [markdown]
@@ -86,7 +86,7 @@ flextab(
     measure="income",
     table="""
     income * (n nmiss sum mean)
-    """,
+    """
 )
 
 # %% [markdown]
@@ -99,7 +99,7 @@ flextab(
     measure="income",
     table="""
     income * region * (n nmiss sum mean)
-    """,
+    """
 )
 
 # %% [markdown]
@@ -113,7 +113,7 @@ flextab(
     region
     ,
     sex
-    """,
+    """
 )
 
 # %% [markdown]
@@ -127,7 +127,7 @@ flextab(
     region * education
     ,
     sex
-    """,
+    """
 )
 
 # %% [markdown]
@@ -141,7 +141,7 @@ flextab(
     region * education
     ,
     sex * age_group
-    """,
+    """
 )
 
 # %% [markdown]
@@ -155,7 +155,7 @@ flextab(
     region education
     ,
     sex age_group
-    """,
+    """
 )
 
 # %% [markdown]
@@ -170,7 +170,7 @@ flextab(
     total region * (sex education)
     ,
     n
-    """,
+    """
 )
 
 # %% [markdown]
@@ -184,7 +184,7 @@ flextab(
     total region * (total education)
     ,
     total sex
-    """,
+    """
 )
 
 # %% [markdown]
@@ -198,7 +198,7 @@ flextab(
     (total region) * (total education)
     ,
     total sex
-    """,
+    """
 )
 
 # %% [markdown]
@@ -213,7 +213,7 @@ flextab(
     total region
     ,
     total sex * income * (n sum mean)
-    """,
+    """
 )
 
 # %% [markdown]
@@ -228,7 +228,7 @@ flextab(
     total region
     ,
     (total sex) * income * (n sum mean)
-    """,
+    """
 )
 
 # %% [markdown]
@@ -243,7 +243,7 @@ flextab(
     total region
     ,
     income * (n nmiss size sum median mean gmean hmean min max std stderr var p1 p99 qrange)
-    """,
+    """
 )
 
 # %% [markdown]
@@ -258,7 +258,7 @@ flextab(
     income * (n nmiss size sum median mean gmean hmean min max std stderr var p1 p99 qrange)
     ,
     total region
-    """,
+    """
 )
 
 # %% [markdown]
@@ -276,7 +276,7 @@ flextab(
     income * (n nmiss size sum median mean gmean hmean min max std stderr var p1 p25 p75 p99 qrange)
     ,
     total region
-    """,
+    """
 )
 
 # %% [markdown]
@@ -303,8 +303,8 @@ flextab(
     table="""
     total region
     ,
-    (total sex) * (pctn income*pctsum)
-    """,
+    (pctn income*pctsum) * (total sex)
+    """
 )
 
 # %%
@@ -316,7 +316,7 @@ flextab(
     total region
     ,
     (pctn income*pctsum) * (total sex)
-    """,
+    """
 )
 
 # %%
@@ -328,7 +328,7 @@ flextab(
     total region
     ,
     (rowpctn income * rowpctsum) * (total sex)
-    """,
+    """
 )
 
 # %%
@@ -340,7 +340,26 @@ flextab(
     total region
     ,
     (colpctn income * colpctsum) * (total sex)
-    """,
+    """
+)
+
+# %% [markdown]
+# Beware that the percentage of the count (PCTN), will be different when we combine it 
+# with a measure column and that column have missing values. 
+# That is because the missing values are omitted for the count of measure column occurence.
+# We see an example below where there is a missing income for the combination sex equals 2
+# and region equals 3.
+
+# %%
+flextab(
+    data=df,
+    groupby=["region", "sex"],
+    measure="income",
+    table="""
+    total region
+    ,
+    (colpctn colpctsum) * income * (total sex)
+    """
 )
 
 # %%
@@ -353,7 +372,7 @@ flextab(
     total region
     ,
     (colpctn income * colpctsum) * (total sex)
-    """,
+    """
 )
 
 # %% [markdown]
@@ -367,7 +386,7 @@ flextab(
     (total sex) * (total region)
     ,
     (total education)*pctn<region>
-    """,
+    """
 )
 
 # %% [markdown]
@@ -382,7 +401,7 @@ flextab(
     (total region)
     ,
     sum * (income tax) pctsum<income> * tax
-    """,
+    """
 )
 
 # %% [markdown]
@@ -397,7 +416,7 @@ flextab(
     (total region)
     ,
     sum * (income tax) * format=9.0_ pctsum<income> * tax * format=9.1
-    """,
+    """
 )
 
 # %% [markdown]
@@ -412,7 +431,7 @@ flextab(
     (total region)
     ,
     sum * (income tax) * format=9,0s pctsum<income> * tax * format=9,1
-    """,
+    """
 )
 
 # %% [markdown]
@@ -428,7 +447,7 @@ flextab(
     ,
     sum='' * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
-    row_header="Region",
+    row_header="Region"
 )
 
 # %% [markdown]
@@ -445,7 +464,7 @@ flextab(
     sum='' * (income='Income' tax='Tax') * format=9,0s pctsum=''<income> * tax='Tax %' * format=9,1
     """,
     row_header="Region",
-    include_missing_in_groupby=False,
+    include_missing_in_groupby=False
 )
 
 # %% [markdown]
@@ -463,7 +482,7 @@ flextab(
     """,
     row_header="Education",
     labels=labels,
-    sort_by="code",
+    sort_by="code"
 )
 
 # %% [markdown]
@@ -481,7 +500,7 @@ flextab(
     """,
     row_header="Education",
     labels=labels,
-    sort_by="label",
+    sort_by="label"
 )
 
 # %%
@@ -496,7 +515,7 @@ flextab(
     """,
     row_header="Education",
     labels=labels,
-    sort_by="index",
+    sort_by="index"
 )
 
 # %% [markdown]
@@ -515,7 +534,7 @@ flextab(
     row_header="Education",
     labels=labels,
     sort_by="index",
-    na_rep="-",
+    na_rep="-"
 )
 
 # %% [markdown]
@@ -559,7 +578,7 @@ flextab(
     include_missing_in_groupby=False,
     labels=labels,
     sort_by="index",
-    style=tabstyle,
+    style=tabstyle
 )
 
 # %% [markdown]
@@ -585,7 +604,7 @@ tab = flextab(
     include_missing_in_groupby=False,
     labels=labels,
     sort_by="index",
-    style=tabstyle,
+    style=tabstyle
 )
 
 excel_filename = "tab1.xlsx"
@@ -609,7 +628,7 @@ tab = flextab(
     include_missing_in_groupby=False,
     labels=labels,
     sort_by="index",
-    style=tabstyle,
+    style=tabstyle
 )
 
 tab_md = tab.to_markdown()

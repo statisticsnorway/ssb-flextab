@@ -1,12 +1,12 @@
 # Flextab Tutorial
 
-`flextab` is a Python function that builds cross-tabulations inspired by 
-the way SAS's `PROC TABULATE` does — statistics crossed with categorical 
-breakdowns, laid out with a compact table expression instead of pivot-table 
+`flextab` is a Python function that builds cross-tabulations inspired by
+the way SAS's `PROC TABULATE` does — statistics crossed with categorical
+breakdowns, laid out with a compact table expression instead of pivot-table
 boilerplate.
 
 `flextab` is made for working on Pandas dataframes.
-It can make flexible tables in one or two dimensions. 
+It can make flexible tables in one or two dimensions.
 
 This tutorial walks through it feature by feature, from the simplest
 one-line call to styled, exportable tables.
@@ -715,15 +715,15 @@ flextab(
 ```
 
 ```text
-                                                        income                  
-                                 PCTN                   PCTSUM                  
-                                  sex                      sex            
+                                                        income
+                                 PCTN                   PCTSUM
+                                  sex                      sex
               TOTAL   nan     1     2  TOTAL   nan     1     2
        TOTAL  100.0  10.0  40.0  50.0  100.0  16.0  35.8  48.1
 region   nan   10.0     .  10.0     .    7.4     .   7.4     .
            1   20.0     .     .  20.0   19.8     .     .  19.8
            2   50.0  10.0  30.0  10.0   54.3  16.0  28.4   9.9
-           3   20.0     .     .  20.0   18.5     .     .  18.5           
+           3   20.0     .     .  20.0   18.5     .     .  18.5
 ```
 
 ### Row and column percentages
@@ -1321,8 +1321,8 @@ table looks in a notebook.
 
 ## Exporting
 
-Beware that output tables may contain sensitive data. Don't save output tables 
-to a github repository. In the examples below they are stored in the working directory. 
+Beware that output tables may contain sensitive data. Don't save output tables
+to a github repository. In the examples below they are stored in the working directory.
 Change the directory to a placement outside the repository before you export tables to external files.
 
 ### To Excel

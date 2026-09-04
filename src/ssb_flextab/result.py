@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from typing import Any
 from typing import ClassVar
@@ -53,7 +54,7 @@ class FlextabResult(pd.DataFrame):
     _metadata: ClassVar[list[str]] = []
 
     @property
-    def _constructor(self):
+    def _constructor(self) -> type[FlextabResult]:
         return FlextabResult
 
     # ── Internal colour helpers ────────────────────────────────────────────
@@ -160,10 +161,14 @@ class FlextabResult(pd.DataFrame):
         """
         try:
             # Access the closure to get the exact formatting parameters
+            closure = formatter.__closure__
+            if closure is None:
+                raise ValueError("Formatter has no closure")
+
             fvars = formatter.__code__.co_freevars
             fvals = {
                 k: v.cell_contents
-                for k, v in zip(fvars, formatter.__closure__, strict=True)
+                for k, v in zip(fvars, closure, strict=True)
             }
             decimals = fvals.get("decimals", 0)
             use_thousands = fvals.get("use_thousands", False)  # _ separator
@@ -206,7 +211,7 @@ class FlextabResult(pd.DataFrame):
         """Return the result as a formatted string."""
         return self.__repr__()
 
-    def _repr_html_(self):
+    def _repr_html_(self) -> str:
         """Jupyter/IPython HTML display.
 
         With format= specs AND inline CSS colours from the style= parameter
@@ -305,6 +310,26 @@ class FlextabResult(pd.DataFrame):
                         lambda mm: f'<th{mm.group(1)} style="{css_str}">',
                         m.group(0),
                     )
+                def _replace_header(
+                    m: re.Match[str],
+                    css_str: str,
+                ) -> str:
+                    return _style_one_th(m, css_str)
+
+
+                def _replace_row_header(
+                    m: re.Match[str],
+                    css_str: str,
+                ) -> str:
+                    return f'<th{m.group(1)} style="{css_str}">'
+
+
+                def _replace_cell(
+                    m: re.Match[str],
+                    css_str: str,
+                ) -> str:
+                    return f'<td{m.group(1)} style="{css_str}">'
+                
 
                 for line in lines:
                     stripped = line.strip()
@@ -331,7 +356,7 @@ class FlextabResult(pd.DataFrame):
                         if css_str:
                             line = _re.sub(
                                 r"<th\b[^>]*>.*?</th>",
-                                lambda m, _c=css_str: _style_one_th(m, _c),
+                                partial(_replace_header, css_str=css_str),
                                 line,
                             )
 
@@ -346,7 +371,7 @@ class FlextabResult(pd.DataFrame):
                         if row_css:
                             line = _re.sub(
                                 r"<th\b([^>]*?)>",
-                                lambda m, css=row_css: f'<th{m.group(1)} style="{css}">',
+                                partial(_replace_row_header, css_str=row_css),
                                 line,
                             )
 
@@ -358,7 +383,7 @@ class FlextabResult(pd.DataFrame):
                         if cell_css:
                             line = _re.sub(
                                 r"<td\b([^>]*?)>",
-                                lambda m, css=cell_css: f'<td{m.group(1)} style="{css}">',
+                                partial(_replace_cell, css_str=cell_css),
                                 line,
                             )
 

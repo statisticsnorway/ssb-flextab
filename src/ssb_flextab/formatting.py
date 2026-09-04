@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
-from typing import Any
+from collections.abc import Callable
+from typing import Any, cast
 
 if TYPE_CHECKING:
     from .result import FlextabResult
@@ -8,8 +9,7 @@ import re
 
 import pandas as pd
 
-
-def _parse_fmt_spec(spec: str):
+def _parse_fmt_spec(spec: str) -> Callable[[Any], str]:
     """Parse a TABLE format specification into a formatter callable.
 
     The formatter is used internally for ``format=`` specifications in the
@@ -120,7 +120,7 @@ def _format_dataframe(
             return na_rep
         formatter = col_fmt_map.get(col_pos) or row_fmt_map.get(row_pos)
         if formatter is not None:
-            return formatter(v)
+            return str(formatter(v))
         try:
             return fmt.format(float(v))
         except Exception:
@@ -255,13 +255,13 @@ def flextab_to_markdown(
     col_labels = [_flatten(c) for c in formatted.columns]
 
     if isinstance(formatted.index, pd.MultiIndex):
-        index_names = [_escape(n) if n else "" for n in formatted.index.names]
+        index_names = [_escape(str(n)) if n else "" for n in formatted.index.names]
         index_rows = [
             [_escape(str(v)) for v in (idx if isinstance(idx, tuple) else (idx,))]
             for idx in formatted.index
         ]
     else:
-        index_names = [_escape(formatted.index.name) if formatted.index.name else ""]
+        index_names = [_escape(str(formatted.index.name)) if formatted.index.name else ""]
         index_rows = [[_escape(str(idx))] for idx in formatted.index]
 
     header = index_names + col_labels

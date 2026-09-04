@@ -1,8 +1,14 @@
 from collections.abc import Callable
+from typing import Any, cast
+
 from numbers import Real
 
 import numpy as np
 import pandas as pd
+
+
+StatFunc = Callable[[pd.Series], int | float]
+WeightedStatFunc = Callable[[pd.Series, pd.Series], float]
 
 
 def _hmean(x: pd.Series) -> float:
@@ -20,10 +26,10 @@ def _hmean(x: pd.Series) -> float:
     x = x[x != 0]
     if len(x) == 0:
         return np.nan
-    return len(x) / (1.0 / x).sum()
+    return float(len(x) / (1.0 / x).sum())
 
 
-_BASE_STATS: dict[str, Callable] = {
+_BASE_STATS: dict[str, StatFunc] = {
     # ── Count statistics ────────────────────────────────────────────────────
     # N, COUNT and SIZE may all be used WITHOUT a measure column (bare count).
     "N": lambda x: x.count(),  # backward-compatible alias for COUNT
@@ -40,7 +46,7 @@ _BASE_STATS: dict[str, Callable] = {
     "MIN": lambda x: x.min(),
     "MAX": lambda x: x.max(),
     "STD": lambda x: x.std(),  # sample std dev (VARDEF=DF, n-1)
-    "STDERR": lambda x: x.sem(),  # standard error of the mean
+    "STDERR": lambda x: float(cast(Any, x.sem())),
     "VAR": lambda x: x.var(),  # sample variance (VARDEF=DF, n-1)
     "MEDIAN": lambda x: x.median(),
     "P1": lambda x: x.quantile(0.01),
@@ -139,77 +145,81 @@ def _wvar(
         return np.nan
     xbar = _wmean(x, w)
     numerator = (w * (x - xbar) ** 2).sum()
-    return (wsum / denom) * numerator
+    return float((wsum / denom) * numerator)
 
 
 def _wstd(
     x: pd.Series,
     w: pd.Series,
-):
-    v = _wvar(x, w)
-    return np.sqrt(v) if pd.notna(v) else np.nan
+) -> float:
+    return float(np.sqrt(_wvar(x, w)))
 
 
 def _wstderr(
     x: pd.Series,
     w: pd.Series,
-):
+) -> float:
     # Standard error of the weighted mean: SD_w / sqrt(sum w)
     x, w = _drop_nan_x(x, w)
     v = _wvar(x, w)
-    wsum = w.sum()
-    return np.sqrt(v / wsum) if pd.notna(v) and wsum else np.nan
+    wsum = float(w.sum())
+    if pd.notna(v) and wsum:
+        return float(np.sqrt(v / wsum))
 
+    return np.nan
 
 def _wpercentile(
     x: pd.Series,
     w: pd.Series,
     q: float,
-):
+) -> float:
     """Weighted percentile via linear interpolation on the weighted ECDF."""
     x, w = _drop_nan_x(x, w)
     if len(x) == 0 or w.sum() == 0:
         return np.nan
-    order = np.argsort(x.values)
-    xs = x.values[order]
-    ws = w.values[order]
+    x_arr = x.to_numpy(dtype=float)
+    w_arr = w.to_numpy(dtype=float)
+
+    order = np.argsort(x_arr)
+    xs = x_arr[order]
+    ws = w_arr[order]
     cw = np.cumsum(ws)
     cutoff = q * cw[-1]
     idx = np.searchsorted(cw, cutoff)
     idx = min(idx, len(xs) - 1)
-    return xs[idx]
+    return float(xs[idx])
 
 
 def _wgmean(
     x: pd.Series,
     w: pd.Series,
-):
+) -> float:
     # Weighted geometric mean: exp( (sum w*ln x) / (sum w) )
     x, w = _drop_nan_x(x, w)
     mask = x > 0
     if not mask.any():
         return np.nan
     xw, ww = x[mask], w[mask]
-    wsum = ww.sum()
+    wsum = float(ww.sum())
     if not wsum:
         return np.nan
-    return np.exp((ww * np.log(xw)).sum() / wsum)
+    return float(np.exp((ww * np.log(xw)).sum() / wsum))
 
 
 def _whmean(
     x: pd.Series,
     w: pd.Series,
-):
+) -> float:
     # Weighted harmonic mean: (sum w) / (sum w/x)
     x, w = _drop_nan_x(x, w)
     mask = x != 0
     if not mask.any():
         return np.nan
     xw, ww = x[mask], w[mask]
-    wsum = ww.sum()
+    wsum = float(ww.sum())
     if not wsum:
         return np.nan
-    return wsum / (ww / xw).sum()
+    return float(wsum / (ww / xw).sum())
 
 
 def _clean_weights(weights: pd.Series) -> pd.Series:
@@ -224,7 +234,7 @@ def _clean_weights(weights: pd.Series) -> pd.Series:
     return cleaned
 
 
-_WEIGHTED_STATS: dict[str, Callable] = {
+_WEIGHTED_STATS: dict[str, WeightedStatFunc] = {
     "N": lambda x, w: x.count(),  # alias for COUNT, NEVER weighted
     "COUNT": lambda x, w: x.count(),  # NEVER weighted - plain count of non-missing values
     "SIZE": lambda x, w: x.size,  # NEVER weighted - plain count of ALL rows
@@ -336,7 +346,7 @@ def _compute_series(
     def _agg(
         groups: list[str],
         func: Callable[[pd.Series], float],
-        wfunc: Callable[[pd.Series, pd.Series], float] | None = None,
+        wfunc: WeightedStatFunc | None = None,
     ) -> pd.Series:
         if var is not None:
             if weight is not None and wfunc is not None:
@@ -404,7 +414,7 @@ def _compute_series(
     grand = _grand(raw_func if var is not None else (lambda x: len(x)), raw_wfunc)
 
     if stat in ("PCTN", "PCTSUM"):
-        return 100.0 * series / grand
+        return cast(pd.Series, 100.0 * series / grand)
 
     if stat in ("ROWPCTN", "ROWPCTSUM"):
         if r_groups:
@@ -421,7 +431,7 @@ def _compute_series(
                 {idx: row_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
             )
-        return 100.0 * series / grand
+        return cast(pd.Series, 100.0 * series / grand)
 
     if stat in ("COLPCTN", "COLPCTSUM"):
         if c_groups:
@@ -441,7 +451,7 @@ def _compute_series(
                 {idx: col_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
             )
-        return 100.0 * series / grand
+        return cast(pd.Series, 100.0 * series / grand)
 
     raise ValueError(f"Unknown statistic: {stat}")
 
@@ -598,7 +608,7 @@ def _compute_all_series(
         if c_groups:
             denom = _agg(c_groups, raw_wfunc)  # total per column group
 
-            def _col_denom(idx: object) -> Real:
+            def _col_denom(idx: object) -> float:
                 # idx is from groups_to_keep = r_context + c_groups
                 # c_groups part starts after r_context groups
                 n_r_ctx = len(groups_to_keep) - len(c_groups)
@@ -607,12 +617,12 @@ def _compute_all_series(
                 else:
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
-                return denom.get(key, np.nan)
+                return float(denom.get(key, np.nan))
 
-            def _safe_pct(val: int | float, denom_val: int | float) -> float:
-                if denom_val is np.nan or denom_val == 0:
+            def _safe_pct(val: int | float, denom_val: float) -> float:
+                if np.isnan(denom_val) or denom_val == 0:
                     return np.nan
-                return 100.0 * val / denom_val
+                return 100.0 * float(val) / denom_val
 
             return pd.Series(
                 {idx: _safe_pct(val, _col_denom(idx)) for idx, val in series.items()},
@@ -620,7 +630,7 @@ def _compute_all_series(
             )
         # No column groups — divide by overall grand total
         with np.errstate(invalid="ignore", divide="ignore"):
-            return 100.0 * series / grand
+            return cast(pd.Series, 100.0 * series / grand)
 
     if stat in ("ROWPCTN", "ROWPCTSUM"):
         # Denominator = total within each row group.
@@ -634,7 +644,7 @@ def _compute_all_series(
                 else:
                     key = (idx,)
                 key = key[0] if len(key) == 1 else key
-                return denom.get(key, np.nan)
+                return float(denom.get(key, np.nan))
 
             def _safe_row_pct(val: float, denom_val: int | float) -> float:
                 if np.isnan(denom_val) or denom_val == 0:
@@ -649,10 +659,10 @@ def _compute_all_series(
                 name=series.name,
             )
         with np.errstate(invalid="ignore", divide="ignore"):
-            return 100.0 * series / grand
+            return cast(pd.Series, 100.0 * series / grand)
 
     # PCTN / PCTSUM: always use overall grand total
-    return 100.0 * series / grand
+    return cast(pd.Series, 100.0 * series / grand)
 
 
 def _parse_denom_def(denom_str: str) -> list[str]:
@@ -692,13 +702,13 @@ def _parse_denom_def(denom_str: str) -> list[str]:
 
 def _compute_custom_pct(
     data: pd.DataFrame,
-    r_groups: list,
-    c_groups: list,
+    r_groups: list[str],
+    c_groups: list[str],
     var: str,
     stat: str,
     denom_def: str,
-    groupby: list,
-    measure: list,
+    groupby: list[str],
+    measure: list[str],
     missing: bool,
     weight: str | None = None,
     r_path_order: list | None = None,

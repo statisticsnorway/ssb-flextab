@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING
 from collections.abc import Callable
-from typing import Any, cast
+from typing import TYPE_CHECKING
+from typing import Any
 
 if TYPE_CHECKING:
     from .result import FlextabResult
@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 import re
 
 import pandas as pd
+
 
 def _parse_fmt_spec(spec: str) -> Callable[[Any], str]:
     """Parse a TABLE format specification into a formatter callable.
@@ -261,7 +262,9 @@ def flextab_to_markdown(
             for idx in formatted.index
         ]
     else:
-        index_names = [_escape(str(formatted.index.name)) if formatted.index.name else ""]
+        index_names = [
+            _escape(str(formatted.index.name)) if formatted.index.name else ""
+        ]
         index_rows = [[_escape(str(idx))] for idx in formatted.index]
 
     header = index_names + col_labels

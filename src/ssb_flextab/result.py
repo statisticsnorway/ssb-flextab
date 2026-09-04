@@ -166,10 +166,7 @@ class FlextabResult(pd.DataFrame):
                 raise ValueError("Formatter has no closure")
 
             fvars = formatter.__code__.co_freevars
-            fvals = {
-                k: v.cell_contents
-                for k, v in zip(fvars, closure, strict=True)
-            }
+            fvals = {k: v.cell_contents for k, v in zip(fvars, closure, strict=True)}
             decimals = fvals.get("decimals", 0)
             use_thousands = fvals.get("use_thousands", False)  # _ separator
             use_space_thous = fvals.get("use_space_thous", False)  # s separator
@@ -310,12 +307,12 @@ class FlextabResult(pd.DataFrame):
                         lambda mm: f'<th{mm.group(1)} style="{css_str}">',
                         m.group(0),
                     )
+
                 def _replace_header(
                     m: re.Match[str],
                     css_str: str,
                 ) -> str:
                     return _style_one_th(m, css_str)
-
 
                 def _replace_row_header(
                     m: re.Match[str],
@@ -323,13 +320,11 @@ class FlextabResult(pd.DataFrame):
                 ) -> str:
                     return f'<th{m.group(1)} style="{css_str}">'
 
-
                 def _replace_cell(
                     m: re.Match[str],
                     css_str: str,
                 ) -> str:
                     return f'<td{m.group(1)} style="{css_str}">'
-                
 
                 for line in lines:
                     stripped = line.strip()

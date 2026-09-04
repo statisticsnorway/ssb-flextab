@@ -1,11 +1,9 @@
 from collections.abc import Callable
-from typing import Any, cast
-
-from numbers import Real
+from typing import Any
+from typing import cast
 
 import numpy as np
 import pandas as pd
-
 
 StatFunc = Callable[[pd.Series], int | float]
 WeightedStatFunc = Callable[[pd.Series, pd.Series], float]
@@ -167,6 +165,7 @@ def _wstderr(
         return float(np.sqrt(v / wsum))
 
     return np.nan
+
 
 def _wpercentile(
     x: pd.Series,
@@ -411,10 +410,12 @@ def _compute_series(
         raw_wfunc = _WEIGHTED_STATS["SUM"]
 
     series = _agg(all_groups, raw_func, raw_wfunc)
-    grand = _grand(raw_func if var is not None else (lambda x: len(x)), raw_wfunc)
+    grand: float = _grand(
+        raw_func if var is not None else (lambda x: len(x)), raw_wfunc
+    )
 
     if stat in ("PCTN", "PCTSUM"):
-        return cast(pd.Series, 100.0 * series / grand)
+        return 100.0 * series / grand
 
     if stat in ("ROWPCTN", "ROWPCTSUM"):
         if r_groups:
@@ -431,7 +432,7 @@ def _compute_series(
                 {idx: row_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
             )
-        return cast(pd.Series, 100.0 * series / grand)
+        return 100.0 * series / grand
 
     if stat in ("COLPCTN", "COLPCTSUM"):
         if c_groups:
@@ -451,7 +452,7 @@ def _compute_series(
                 {idx: col_pct(val, idx) for idx, val in series.items()},
                 name=series.name,
             )
-        return cast(pd.Series, 100.0 * series / grand)
+        return 100.0 * series / grand
 
     raise ValueError(f"Unknown statistic: {stat}")
 
@@ -539,7 +540,7 @@ def _compute_all_series(
 
     def _agg(
         groups: list[str],
-        wfunc: Callable[[pd.Series, pd.Series], float] | None = None,
+        wfunc: WeightedStatFunc | None = None,
     ):
         if var is not None:
             if weight is not None and wfunc is not None:
@@ -659,7 +660,7 @@ def _compute_all_series(
                 name=series.name,
             )
         with np.errstate(invalid="ignore", divide="ignore"):
-            return cast(pd.Series, 100.0 * series / grand)
+            return 100.0 * series / grand
 
     # PCTN / PCTSUM: always use overall grand total
     return cast(pd.Series, 100.0 * series / grand)
@@ -711,8 +712,8 @@ def _compute_custom_pct(
     measure: list[str],
     missing: bool,
     weight: str | None = None,
-    r_path_order: list | None = None,
-    c_path_order: list | None = None,
+    r_path_order: list[tuple[Any, ...]] | None = None,
+    c_path_order: list[tuple[Any, ...]] | None = None,
 ) -> pd.Series:
     """Compute a percentage statistic with a user-defined denominator.
 
@@ -816,24 +817,29 @@ def _compute_custom_pct(
                 d = data.dropna(subset=[weight]).copy()
                 d[weight] = _clean_weights(d[weight])
                 d = d.dropna(subset=[var_col])
+
                 if groups:
-                    return (
-                        d.groupby(groups, dropna=dropna)
-                        .apply(
-                            lambda g: (g[var_col] * g[weight]).sum(),
-                            include_groups=False,
-                        )
-                        .rename(None)
+                    grouped = d.groupby(groups, dropna=dropna)[[var_col, weight]]
+
+                    result = grouped.apply(
+                        lambda g: float((g[var_col] * g[weight]).sum())
                     )
-                return pd.Series({"__total__": (d[var_col] * d[weight]).sum()})
-            else:
-                if groups:
-                    return data.groupby(groups, dropna=dropna)[var_col].sum()
-                return pd.Series({"__total__": data[var_col].sum()})
-        else:
+
+                    return cast(pd.Series, result.rename(None))
+
+                return pd.Series(
+                    {"__total__": float((d[var_col] * d[weight]).sum())}
+                )
+
             if groups:
-                return data.groupby(groups, dropna=dropna).size().rename(None)
-            return pd.Series({"__total__": len(data)})
+                return data.groupby(groups, dropna=dropna)[var_col].sum()
+
+            return pd.Series({"__total__": data[var_col].sum()})
+
+        if groups:
+            return data.groupby(groups, dropna=dropna).size().rename(None)
+
+        return pd.Series({"__total__": len(data)})
 
     def _norm_for_lookup(v: object) -> object:
         if v is None:
@@ -962,6 +968,8 @@ def _compute_custom_pct(
             elif g in c_groups:
                 pos = len(r_groups) + c_groups.index(g)
                 denom_key_vals.append(idx_t[pos] if pos < len(idx_t) else None)
+        
+        denom_key: object
         if len(denom_key_vals) == 0:
             denom_key = "__total__"
         elif len(denom_key_vals) == 1:

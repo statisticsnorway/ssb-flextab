@@ -6,9 +6,11 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 from typing import ClassVar
+from typing import cast
 
 import pandas as pd
 from openpyxl.cell.cell import Cell
+from openpyxl.cell.cell import MergedCell
 from openpyxl.styles.fills import PatternFill
 
 from .formatting import _format_dataframe
@@ -200,9 +202,9 @@ class FlextabResult(pd.DataFrame):
         """Return the formatted string representation of the result."""
         try:
             fmt = self.attrs.get("default_fmt", "{:.1f}")
-            return _format_dataframe(self, fmt=fmt, na_rep=".").to_string()
+            return str(_format_dataframe(self, fmt=fmt, na_rep=".").to_string())
         except Exception:
-            return super().__repr__()
+            return str(super().__repr__())
 
     def __str__(self) -> str:
         """Return the result as a formatted string."""
@@ -392,13 +394,15 @@ class FlextabResult(pd.DataFrame):
                     out.append(line)
                 html = "\n".join(out)
 
-            return html
+            return str(html)
         except Exception:
-            return super()._repr_html_()
+            # pandas-stubs doesn't declare this IPython display hook on
+            # DataFrame, even though it exists at runtime.
+            return str(super()._repr_html_())  # type: ignore[misc]
 
     # ── Excel export ──────────────────────────────────────────────────────
 
-    def to_excel(
+    def to_excel(  # type: ignore[misc, override]
         self,
         excel_writer: str | Path | pd.ExcelWriter,
         sheet_name: str = "Sheet1",
@@ -480,13 +484,20 @@ class FlextabResult(pd.DataFrame):
             buf.seek(0)
             wb = load_workbook(buf)
         else:
-            # ExcelWriter with openpyxl engine: access the workbook directly
+            # ExcelWriter with openpyxl engine: access the workbook directly.
+            # `is_path` is False here, so `excel_writer` is not a str/Path;
+            # narrow it explicitly for mypy rather than relying on that
+            # control-flow fact alone.
+            if isinstance(excel_writer, (str, Path)):
+                return  # unreachable in practice, but keeps mypy honest
             try:
-                wb = excel_writer.book
+                wb = cast("pd.ExcelWriter", excel_writer).book
             except AttributeError:
                 return  # can't access workbook; skip formatting
 
         ws = wb[sheet_name] if sheet_name in wb.sheetnames else wb.active
+        if ws is None:
+            return  # no worksheet available; skip formatting
 
         # pandas writes n_col_header_rows for the column MultiIndex levels,
         # PLUS an extra row for the index name(s) when any index level has a
@@ -514,7 +525,9 @@ class FlextabResult(pd.DataFrame):
             return Font(color=hex_color)
 
         def _apply(
-            cell: Cell, bg_hex: str | None = None, fg_hex: str | None = None
+            cell: Cell | MergedCell,
+            bg_hex: str | None = None,
+            fg_hex: str | None = None,
         ) -> None:
             if bg_hex:
                 cell.fill = _fill(bg_hex)

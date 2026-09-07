@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -202,17 +204,17 @@ _SENTINEL = "__total__"
 
 def flextab(
     data: pd.DataFrame,
-    measure: str | list | None = None,
-    groupby: str | list | None = None,
+    measure: str | list[str] | None = None,
+    groupby: str | list[str] | None = None,
     table: str | None = None,
     include_missing_in_groupby: bool = True,
     fmt: str = "{:.1f}",
     na_rep: str | None = None,
-    labels: dict | None = None,
+    labels: dict[str, dict[Any, str]] | None = None,
     sort_by: str = "code",
     weight: str | None = None,
     row_header: str | None = None,
-    style: dict | None = None,
+    style: dict[str, Any] | None = None,
 ) -> FlextabResult:
     """Build a cross-tabulation table similar to SAS PROC TABULATE.
 
@@ -493,7 +495,7 @@ def flextab(
     else:
         row_dim, col_dim = dims[0], dims[1]
 
-    def expand_dim(dim_node: DimNode | None):
+    def expand_dim(dim_node: DimNode | None) -> list[dict[str, Any]]:
         if dim_node is None:
             return [
                 {
@@ -545,9 +547,9 @@ def flextab(
     def orig_groups(spec: dict[str, Any]) -> list[str]:
         return [col for col, _ in spec["group_keys"]]
 
-    cells: dict = {}
-    row_hdr_path: dict = {}
-    col_hdr_path: dict = {}
+    cells: dict[Any, dict[Any, Any]] = {}
+    row_hdr_path: dict[Any, tuple[list[Any], int]] = {}
+    col_hdr_path: dict[Any, tuple[list[Any], int]] = {}
 
     for r_spec in row_specs:
         r_hdr = spec_header(r_spec)
@@ -1003,8 +1005,10 @@ def flextab(
 
 
 def _sort_row_keys(
-    row_keys: list, hdr_path: dict | None = None, value_key_fn: str | None = None
-) -> list:
+    row_keys: list[tuple[Any, Any]],
+    hdr_path: dict[Any, tuple[list[Any], int]] | None = None,
+    value_key_fn: Callable[[str | None, Any], tuple[int, int | str]] | None = None,
+) -> list[tuple[Any, Any]]:
     """Re-order row/column keys to follow the TABLE expression's written order.
 
     Two ordering rules combine, applied in this priority:
@@ -1070,10 +1074,12 @@ def _sort_row_keys(
         return _normalise(v)
 
     def _po(hdr: Any) -> list[Any]:
-        return hdr_path.get(hdr, ([], 0))[0]
+        entry: tuple[list[Any], int] = hdr_path.get(hdr, ([], 0))
+        return entry[0]
 
     def _branch(hdr: Any) -> int:
-        return hdr_path.get(hdr, ([], 0))[1]
+        entry: tuple[list[Any], int] = hdr_path.get(hdr, ([], 0))
+        return entry[1]
 
     # Determine the maximum path length and, for each position, whether ANY
     # spec has a real groupby variable there (kind='group').
@@ -1103,7 +1109,7 @@ def _sort_row_keys(
     # (e.g. "n" inside "(SUM COLPCTSUM n nmiss ...)"), silently reordering
     # that branch's internal stats to match the EARLIER branch's first
     # appearance instead of THIS branch's own written order.
-    label_order: dict[tuple, dict[int, dict]] = {}
+    label_order: dict[int, dict[int, dict[Any, int]]] = {}
     for hdr, _ in row_keys:
         po = _po(hdr)
         branch = _branch(hdr)
@@ -1120,7 +1126,7 @@ def _sort_row_keys(
     # together (e.g. all origin values); specs with different orig_cols at
     # that position should be fully separated (e.g. gender block then
     # age_group block, even when they share value strings like '1' and '2').
-    pos_col_ordinal: dict[int, dict] = {}
+    pos_col_ordinal: dict[int, dict[Any, int]] = {}
     for hdr, _ in row_keys:
         po = _po(hdr)
         for i, entry in enumerate(po):
@@ -1139,7 +1145,7 @@ def _sort_row_keys(
             dk = ()
 
         dk_iter = iter(dk if isinstance(dk, tuple) else (dk,))
-        parts = []
+        parts: list[tuple[Any, ...]] = []
         for i in range(max_len):
             if i >= len(po):
                 parts.append((0, 0, ""))
@@ -1191,7 +1197,7 @@ def _normalise_key(val: Any) -> Any:
     return val
 
 
-def _normalise_idx(idx_tuple: tuple):
+def _normalise_idx(idx_tuple: tuple[Any, ...]) -> tuple[Any, ...]:
     """Apply _normalise_key to every element of an index tuple."""
     return tuple(_normalise_key(v) for v in idx_tuple)
 
@@ -1209,8 +1215,9 @@ def _fill_cells(
     n_c = len(c_groups)
 
     for idx_val, value in series.items():
+        idx_tuple: tuple[Any, ...]
         if isinstance(series.index, pd.MultiIndex):
-            idx_tuple = idx_val
+            idx_tuple = cast("tuple[Any, ...]", idx_val)
         else:
             idx_tuple = (idx_val,)
 

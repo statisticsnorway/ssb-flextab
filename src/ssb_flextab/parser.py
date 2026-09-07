@@ -1,11 +1,17 @@
 import re
 from dataclasses import dataclass
 from dataclasses import field
+from typing import Any
 
 from .statistics import ALL_STATS
 
+# A token is a 3-tuple (kind, value, label). The label slot is only ever
+# populated for "NAME" tokens (via name='Label' syntax); every other kind
+# carries None in that position, so all tokens share one uniform shape.
+Token = tuple[str, str, str | None]
 
-def _tokenize(expr: str) -> list[tuple]:
+
+def _tokenize(expr: str) -> list[Token]:
     """Tokenize a single TABLE dimension expression into a flat list of tokens."""
     pattern = re.compile(
         r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)"
@@ -17,7 +23,7 @@ def _tokenize(expr: str) -> list[tuple]:
         r"|(?P<space>\s+)"
     )
 
-    tokens = []
+    tokens: list[Token] = []
     pos = 0
 
     for m in pattern.finditer(expr):
@@ -28,10 +34,10 @@ def _tokenize(expr: str) -> list[tuple]:
         pos = m.end()
 
         if m.group("fmt"):
-            tokens.append(("FMT", m.group("fmt_spec")))
+            tokens.append(("FMT", m.group("fmt_spec"), None))
         elif m.group("denom"):
             inner = m.group("denom")[1:-1].strip()
-            tokens.append(("DENOM", inner))
+            tokens.append(("DENOM", inner, None))
         elif m.group("labeled"):
             label = (
                 m.group("dq_label")
@@ -42,15 +48,15 @@ def _tokenize(expr: str) -> list[tuple]:
         elif m.group("name"):
             tokens.append(("NAME", m.group("name"), None))
         elif m.group("op"):
-            tokens.append(("OP", m.group("op")))
+            tokens.append(("OP", m.group("op"), None))
         elif m.group("space"):
-            tokens.append(("SP", " "))
+            tokens.append(("SP", " ", None))
 
     if pos != len(expr):
         invalid = expr[pos:]
         raise SyntaxError(f"Unexpected character(s) {invalid!r} at position {pos}")
 
-    cleaned = []
+    cleaned: list[Token] = []
     for token in tokens:
         if token[0] == "SP" and cleaned and cleaned[-1][0] == "SP":
             continue
@@ -136,24 +142,24 @@ class DimNode:
 
 
 class _Parser:
-    def __init__(self, tokens: list[tuple]) -> None:
+    def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
         self.pos = 0
 
-    def _skip_sp(self):
+    def _skip_sp(self) -> None:
         while self.pos < len(self.tokens) and self.tokens[self.pos][0] == "SP":
             self.pos += 1
 
-    def peek(self) -> tuple | None:
+    def peek(self) -> Token | None:
         p = self.pos
         while p < len(self.tokens) and self.tokens[p][0] == "SP":
             p += 1
         return self.tokens[p] if p < len(self.tokens) else None
 
-    def consume_op(self, val: str):
+    def consume_op(self, val: str) -> None:
         self._skip_sp()
         t = self.tokens[self.pos]
-        if t != ("OP", val):
+        if t[0] != "OP" or t[1] != val:
             raise SyntaxError(f"Expected operator '{val}', got {t}")
         self.pos += 1
 
@@ -207,7 +213,7 @@ class _Parser:
                 break
         return nodes[0] if len(nodes) == 1 else DimNode(kind="cross", children=nodes)
 
-    def _apply_fmt(self, node: DimNode, fmt_spec: str):
+    def _apply_fmt(self, node: DimNode, fmt_spec: str) -> None:
         """Apply a format= spec to a node.
 
         For a leaf node (var/all), the format is set directly on it - this
@@ -329,7 +335,7 @@ def _split_dimensions(expr: str) -> list[str]:
     return parts
 
 
-def parse_table(table_str: str) -> tuple:
+def parse_table(table_str: str) -> tuple[DimNode, ...]:
     """Parse table."""
     dims = _split_dimensions(table_str)
     if len(dims) > 2:
@@ -364,7 +370,7 @@ def _expand_node(node: DimNode) -> list[list[DimNode]]:
     raise ValueError(f"Unknown node kind: {node.kind}")
 
 
-def _expand_node_with_branch(node: DimNode):
+def _expand_node_with_branch(node: DimNode) -> list[tuple[int, list[DimNode]]]:
     """Like _expand_node.
 
     But additionally returns a top-level branch index for
@@ -395,7 +401,7 @@ def _expand_node_with_branch(node: DimNode):
 
 def _classify_path(
     path: list[DimNode], measure_list: list[str], groupby_list: list[str]
-):
+) -> dict[str, Any]:
     measure_map = {m.upper(): m for m in measure_list}
     groupby_map = {g.upper(): g for g in groupby_list}
 
@@ -431,7 +437,7 @@ def _classify_path(
                 f"Known statistics: {sorted(ALL_STATS)}"
             )
 
-    path_order = []
+    path_order: list[tuple[str, str, str | None]] = []
     for node in path:
         upper = node.name.upper() if node.name else ""
         if node.kind == "all":

@@ -725,10 +725,10 @@ def _compute_custom_pct(
     data : pd.DataFrame
         Input data used to compute the numerator and denominator.
 
-    r_groups : list
+    r_groups : list[str]
         Grouping columns in the row dimension.
 
-    c_groups : list
+    c_groups : list[str]
         Grouping columns in the column dimension.
 
     var : str
@@ -740,10 +740,10 @@ def _compute_custom_pct(
     denom_def : str
         Denominator definition from the ``<...>`` expression.
 
-    groupby : list
+    groupby : list[str]
         Available grouping variables.
 
-    measure : list
+    measure : list[str]
         Available measure variables.
 
     missing : bool
@@ -752,10 +752,10 @@ def _compute_custom_pct(
     weight : str | None
         Optional name of the weight column.
 
-    r_path_order : list | None
+    r_path_order : list[tuple[Any, ...]] | None
         Parsed row path used to determine the innermost breakdown variable.
 
-    c_path_order : list | None
+    c_path_order : list[tuple[Any, ...]] | None
         Parsed column path used to determine the innermost breakdown variable.
 
     Returns
@@ -827,9 +827,7 @@ def _compute_custom_pct(
 
                     return cast(pd.Series, result.rename(None))
 
-                return pd.Series(
-                    {"__total__": float((d[var_col] * d[weight]).sum())}
-                )
+                return pd.Series({"__total__": float((d[var_col] * d[weight]).sum())})
 
             if groups:
                 return data.groupby(groups, dropna=dropna)[var_col].sum()
@@ -968,7 +966,7 @@ def _compute_custom_pct(
             elif g in c_groups:
                 pos = len(r_groups) + c_groups.index(g)
                 denom_key_vals.append(idx_t[pos] if pos < len(idx_t) else None)
-        
+
         denom_key: object
         if len(denom_key_vals) == 0:
             denom_key = "__total__"

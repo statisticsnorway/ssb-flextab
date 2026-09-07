@@ -228,7 +228,7 @@ def flextab(
     data : pd.DataFrame
         Input data.
 
-    measure : str | list | None
+    measure : str | list[str] | None
         Numeric analysis variable name or names (SAS: VAR). A single column
         can be passed as a plain string, for example ``measure="income"``
         instead of ``measure=["income"]``.
@@ -236,7 +236,7 @@ def flextab(
         Omit this argument for count-only tables that use ``N``, ``COUNT``,
         ``SIZE``, or percentage statistics that do not require a measure.
 
-    groupby : str | list | None
+    groupby : str | list[str] | None
         Categorical grouping variable name or names (SAS: CLASS). A single
         column can be passed as a plain string, for example
         ``groupby="origin"`` instead of ``groupby=["origin"]``.
@@ -320,7 +320,7 @@ def flextab(
         preferable when the returned table will be used for further numeric
         operations.
 
-    labels : dict | None
+    labels : dict[str, dict[Any, str]] | None
         Mapping from original groupby values to display labels.
 
         The outer dictionary key is the groupby column name. The inner
@@ -386,7 +386,7 @@ def flextab(
 
         labels the leftmost index column as ``Region``.
 
-    style : dict | None
+    style : dict[str, Any] | None
         Colour styling applied to notebook display and Excel export.
 
         Colours may be specified as:

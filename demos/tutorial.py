@@ -651,7 +651,7 @@ with open(markdown_filename, "w", encoding="utf-8") as f:
 # %%
 sex_list = ["Total", *df["sex"].unique().tolist()]
 
-for s, r in zip(sex_list, range(0, len(sex_list) + 1), strict=True):
+for s, r in zip(sex_list, range(0, len(sex_list)), strict=True):
     if r == 0:
         rows = df
         print("\nTable 1: Education and region. Total")

@@ -541,7 +541,7 @@ def _compute_all_series(
     def _agg(
         groups: list[str],
         wfunc: WeightedStatFunc | None = None,
-    ):
+    ) -> pd.Series:
         if var is not None:
             if weight is not None and wfunc is not None:
                 cols = [var, weight]

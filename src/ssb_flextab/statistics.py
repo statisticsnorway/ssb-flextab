@@ -373,13 +373,13 @@ def _compute_series(
     def _grand(
         func: Callable[[pd.Series], float],
         wfunc: Callable[[pd.Series, pd.Series], float] | None = None,
-    ) -> float | int:
+    ) -> float:
         if var is not None:
             if weight is not None and wfunc is not None:
-                return wfunc(data[var], data[weight])
-            return func(data[var])
+                return float(wfunc(data[var], data[weight]))
+            return float(func(data[var]))
         # No measure variable: ALWAYS a plain row count (N is never weighted)
-        return len(data)
+        return float(len(data))
 
     if stat in _BASE_STATS:
         if var is None and stat not in ("N", "COUNT", "SIZE"):
@@ -706,7 +706,7 @@ def _compute_custom_pct(
     data: pd.DataFrame,
     r_groups: list[str],
     c_groups: list[str],
-    var: str,
+    var: str | None,
     stat: str,
     denom_def: str,
     groupby: list[str],
@@ -732,8 +732,9 @@ def _compute_custom_pct(
     c_groups : list[str]
         Grouping columns in the column dimension.
 
-    var : str
-        Measure column used for the numerator.
+    var : str | None
+        Measure column used for the numerator, or None for a bare count-based
+        PCTN with no measure variable.
 
     stat : str
         Percentage statistic to compute.

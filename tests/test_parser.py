@@ -394,7 +394,7 @@ class TestTokenize:
         tokens = _tokenize("income*mean")
         assert tokens == [
             ("NAME", "income", None),
-            ("OP", "*"),
+            ("OP", "*", None),
             ("NAME", "mean", None),
         ]
 
@@ -404,16 +404,16 @@ class TestTokenize:
 
     def test_denom_token_strips_brackets(self):
         tokens = _tokenize("pctsum<region>")
-        assert ("DENOM", "region") in tokens
+        assert ("DENOM", "region", None) in tokens
 
     def test_format_token_captures_spec(self):
         tokens = _tokenize("format=9,1s")
-        assert tokens == [("FMT", "9,1s")]
+        assert tokens == [("FMT", "9,1s", None)]
 
     def test_redundant_whitespace_is_collapsed(self):
         tokens = _tokenize("sex   region")
         assert tokens == [
             ("NAME", "sex", None),
-            ("SP", " "),
+            ("SP", " ", None),
             ("NAME", "region", None),
         ]

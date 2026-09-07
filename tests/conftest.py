@@ -3,7 +3,7 @@ import pytest
 
 
 @pytest.fixture
-def df():
+def df() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "sex": ["1", "1", "2", "1", None, "2", "2", "1", "2", "2"],
@@ -18,7 +18,7 @@ def df():
 
 
 @pytest.fixture
-def labels():
+def labels() -> dict[str, dict[str, str]]:
     return {
         "sex": {"1": "Males", "2": "Females"},
         "age_group": {"1": "0-19", "2": "20-66", "3": "67+"},

@@ -31,12 +31,14 @@ Run with:  pytest tests/test_formatting.py -v
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
 import pytest
 from openpyxl import load_workbook
 from openpyxl.cell.cell import Cell
+from openpyxl.cell.cell import MergedCell
 
 from ssb_flextab.formatting import _format_dataframe
 from ssb_flextab.formatting import _parse_fmt_spec
@@ -495,6 +497,7 @@ class TestToExcel:
 
         wb = load_workbook(path)
         ws = wb.active
+        assert ws is not None
         # data starts at row 2 (1 header row, no index name row since
         # "Sex" name IS written but on the header row itself for a flat index)
         income_cells = [ws.cell(r_, 2) for r_ in range(2, ws.max_row + 1)]
@@ -514,6 +517,7 @@ class TestToExcel:
 
         wb = load_workbook(path)
         ws = wb.active
+        assert ws is not None
         # 2 column-header levels + 1 index-name row = 3 header rows,
         # so data rows are 4 (M) and 5 (F).
         assert ws.max_row == 5
@@ -535,9 +539,10 @@ class TestToExcel:
 
         wb = load_workbook(path)
         ws = wb.active
+        assert ws is not None
 
-        def argb(cell: Cell) -> str | None:
-            return cell.fill.fgColor.rgb
+        def argb(cell: Cell | MergedCell) -> str | None:
+            return cast("str | None", cell.fill.fgColor.rgb)
 
         assert argb(ws.cell(1, 2)) == "00D3D3D3"  # "Income" header
         assert argb(ws.cell(1, 1)) == "00000000"  # "Sex" row-header cell, unstyled
@@ -552,6 +557,7 @@ class TestToExcel:
         r.to_excel(path)
         wb = load_workbook(path)
         ws = wb.active
+        assert ws is not None
         assert isinstance(ws.cell(2, 2).value, (int, float))
 
     def test_no_style_or_fmt_still_writes_a_plain_file(self, tmp_path: Path) -> None:
@@ -561,6 +567,7 @@ class TestToExcel:
         r.to_excel(path)
         wb = load_workbook(path)
         ws = wb.active
+        assert ws is not None
         assert ws.cell(2, 2).value == 100.0
 
 

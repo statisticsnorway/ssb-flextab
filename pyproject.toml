@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.2.6,<3.0.0",
     "pandas>=2.2.3,<4.0.0",
     "openpyxl>=3.1.0,<4.0.0",
+    "pandas-stubs (>=3.0.5.260730,<4.0.0.0)",
 ]
 
 [project.urls]
@@ -84,6 +85,7 @@ fail_under = 50
 DEP001 = ["nox", "nox_poetry"]  # packages available by default
 
 [tool.mypy]
+mypy_path = "src"
 strict = true
 warn_unreachable = true
 pretty = true

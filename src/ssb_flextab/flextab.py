@@ -950,7 +950,7 @@ def flextab(
         if D_final == 0:
             return pd.Index([""] * len(keys))
         if D_final == 1:
-            return pd.Index([t[0] for t in labels])
+            return cast(pd.Index, pd.Index([t[0] for t in labels]))
         return pd.MultiIndex.from_tuples(labels)
 
     row_idx = make_index(all_row_keys, row_hdr_path)

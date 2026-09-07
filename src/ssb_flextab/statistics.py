@@ -583,6 +583,7 @@ def _compute_all_series(
             f"NMISS, PCTN, ROWPCTN, COLPCTN."
         )
 
+    grand: float
     if count_based:
         raw_func = _BASE_STATS["N"] if var is not None else (lambda x: x.count())
         raw_wfunc = _WEIGHTED_STATS["N"] if var is not None else None
@@ -631,7 +632,7 @@ def _compute_all_series(
             )
         # No column groups — divide by overall grand total
         with np.errstate(invalid="ignore", divide="ignore"):
-            return cast(pd.Series, 100.0 * series / grand)
+            return 100.0 * series / grand
 
     if stat in ("ROWPCTN", "ROWPCTSUM"):
         # Denominator = total within each row group.
@@ -663,7 +664,7 @@ def _compute_all_series(
             return 100.0 * series / grand
 
     # PCTN / PCTSUM: always use overall grand total
-    return cast(pd.Series, 100.0 * series / grand)
+    return 100.0 * series / grand
 
 
 def _parse_denom_def(denom_str: str) -> list[str]:

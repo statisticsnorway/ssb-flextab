@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import cast
 
 if TYPE_CHECKING:
     from .result import FlextabResult
@@ -180,7 +179,7 @@ def flextab_to_string(
 
         print(flextab_to_string(r, na_rep="-"))
     """
-    return cast(str, _format_dataframe(result, fmt=fmt, na_rep=na_rep).to_string())
+    return _format_dataframe(result, fmt=fmt, na_rep=na_rep).to_string()
 
 
 def flextab_to_markdown(

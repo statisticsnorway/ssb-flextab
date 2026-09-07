@@ -35,7 +35,11 @@ from ssb_flextab.parser import parse_table
 
 def leaf_names(path: list[DimNode]) -> list[str]:
     """Pull the .name off each node in an expanded leaf path."""
-    return [n.name for n in path]
+    names = []
+    for n in path:
+        assert n.name is not None, "leaf node unexpectedly has no name"
+        names.append(n.name)
+    return names
 
 
 def only_path(node: DimNode) -> list[DimNode]:

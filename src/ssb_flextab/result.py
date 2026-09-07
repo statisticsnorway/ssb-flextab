@@ -6,7 +6,6 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 from typing import ClassVar
-from typing import cast
 
 import pandas as pd
 from openpyxl.cell.cell import Cell
@@ -491,7 +490,7 @@ class FlextabResult(pd.DataFrame):
             if isinstance(excel_writer, (str, Path)):
                 return  # unreachable in practice, but keeps mypy honest
             try:
-                wb = cast("pd.ExcelWriter", excel_writer).book
+                wb = excel_writer.book
             except AttributeError:
                 return  # can't access workbook; skip formatting
 

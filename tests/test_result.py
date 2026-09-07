@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -7,18 +9,20 @@ from ssb_flextab import flextab
 
 class TestResultObject:
 
-    def test_returns_flextab_result_subclass(self, df):
+    def test_returns_flextab_result_subclass(self, df: pd.DataFrame) -> None:
         r = flextab(data=df, groupby="sex", table="sex, N")
         assert isinstance(r, FlextabResult)
         assert isinstance(r, pd.DataFrame)
 
-    def test_values_stay_numeric_for_further_computation(self, df):
+    def test_values_stay_numeric_for_further_computation(
+        self, df: pd.DataFrame
+    ) -> None:
         r = flextab(
             data=df, groupby="sex", measure="income", table="sex, income=''*SUM"
         )
         assert r["SUM"].sum() == pytest.approx(df["income"].sum())
 
-    def test_to_excel_writes_a_file(self, df, tmp_path):
+    def test_to_excel_writes_a_file(self, df: pd.DataFrame, tmp_path: Path) -> None:
         r = flextab(
             data=df,
             groupby="sex",
@@ -31,7 +35,7 @@ class TestResultObject:
         assert out_path.exists()
         assert out_path.stat().st_size > 0
 
-    def test_repr_html_runs_without_error(self, df):
+    def test_repr_html_runs_without_error(self, df: pd.DataFrame) -> None:
         r = flextab(
             data=df,
             groupby="sex",

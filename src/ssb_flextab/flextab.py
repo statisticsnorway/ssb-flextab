@@ -520,7 +520,7 @@ def flextab(
     col_specs = expand_dim(col_dim)
     row_specs = expand_dim(row_dim)
 
-    def spec_header(spec: dict[str, Any]) -> tuple[str, ...]:
+    def spec_header(spec: dict[str, Any]) -> tuple[Any, ...]:
         # Build a header tuple that uniquely identifies this spec.
         # For group entries, use the label when non-blank.
         # When the label is blank (suppressed with =''), fall back to the
@@ -542,7 +542,20 @@ def flextab(
                 )  # prefix ensures no collision with real labels
             else:
                 parts.append(label)
-        return tuple(parts) if parts else ("",)
+        header = tuple(parts) if parts else ("",)
+        # Two DISTINCT top-level (space-separated) entries can still produce
+        # identical label text — e.g. "total sex total education total
+        # region" repeats the default 'TOTAL' label three times, and a user
+        # may also deliberately reuse the same explicit label twice. Without
+        # a further discriminator these specs would collapse onto the same
+        # dict key in `cells`/`row_hdr_path`/`col_hdr_path` and silently
+        # overwrite one another, dropping all but the last occurrence.
+        # `spec["branch"]` is the top-level concat branch index (unique per
+        # space-separated entry), so folding it in here keeps same-text
+        # repeats as distinct rows/columns. It is never shown to the user —
+        # display text is built from `path_order` alone in
+        # `_key_to_label_slotted`.
+        return (*header, ("\x00branch", spec["branch"]))
 
     def orig_groups(spec: dict[str, Any]) -> list[str]:
         return [col for col, _ in spec["group_keys"]]

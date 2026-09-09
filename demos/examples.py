@@ -54,7 +54,7 @@ def distribute_income(x: pd.Series) -> np.ndarray:
     """
     shares = rng.lognormal(mean=0, sigma=0.8, size=len(x))
     shares /= shares.sum()
-    return shares * x.iloc[0]
+    return np.asarray(shares * x.iloc[0], dtype=float)
 
 
 

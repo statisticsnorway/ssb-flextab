@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 from typing import cast
 
@@ -200,6 +201,703 @@ EXAMPLES
 """
 
 _SENTINEL = "__total__"
+
+# Canonical sentinel for all missing-value types in group keys.
+# Using a distinct string ensures consistent hashing regardless of whether
+# pandas returns float nan, pd.NA, pd.NaT, or None for missing group levels.
+_NAN_SENTINEL = "__nan__"
+
+
+# ---------------------------------------------------------------------------
+# Argument normalisation / default TABLE expression
+# ---------------------------------------------------------------------------
+
+
+def _normalize_measure_groupby(
+    measure: str | list[str] | None,
+    groupby: str | list[str] | None,
+) -> tuple[list[str], list[str]]:
+    """Allow a single column name to be passed as a plain string."""
+    if isinstance(measure, str):
+        measure = [measure]
+    if isinstance(groupby, str):
+        groupby = [groupby]
+    return measure or [], groupby or []
+
+
+def _default_table_expr(measure: list[str], groupby: list[str]) -> str:
+    """Build the default TABLE expression when none is supplied."""
+    if measure:
+        col_expr = " ".join(f"{v} * (N MEAN)" for v in measure)
+        if groupby:
+            row_expr = " ".join(groupby)
+            return f"{row_expr}, {col_expr}"
+        return col_expr
+    if groupby:
+        row_expr = " ".join(groupby)
+        return f"{row_expr}, N"
+    return "N"
+
+
+def _split_dims(
+    dims: list[DimNode],
+) -> tuple[DimNode | None, DimNode]:
+    """Split the parsed TABLE expression into (row_dim, col_dim)."""
+    if len(dims) == 1:
+        return None, dims[0]
+    return dims[0], dims[1]
+
+
+# ---------------------------------------------------------------------------
+# Dimension spec expansion
+# ---------------------------------------------------------------------------
+
+
+def _expand_dim(
+    dim_node: DimNode | None,
+    measure: list[str],
+    groupby: list[str],
+) -> list[dict[str, Any]]:
+    if dim_node is None:
+        return [
+            {
+                "group_keys": [],
+                "var": None,
+                "var_label": None,
+                "stat": None,
+                "stat_label": None,
+                "has_all": False,
+                "all_label": None,
+                "path_order": [],
+                "branch": 0,
+            }
+        ]
+    specs = []
+    for branch_idx, path in _expand_node_with_branch(dim_node):
+        spec = _classify_path(path, measure, groupby)
+        spec["branch"] = branch_idx
+        specs.append(spec)
+    return specs
+
+
+def _spec_header(spec: dict[str, Any]) -> tuple[Any, ...]:
+    # Build a header tuple that uniquely identifies this spec.
+    # For group entries, use the label when non-blank.
+    # When the label is blank (suppressed with =''), fall back to the
+    # original column name so that e.g. origin='' and type='' produce
+    # distinct headers ('origin',) and ('type',) rather than both
+    # collapsing to ('',), which would cause sorting to treat all their
+    # values as belonging to the same spec and sort them together.
+    # The orig_name is used ONLY as an internal discriminator here —
+    # it does not affect what gets displayed in the table header.
+    parts = []
+    for entry in spec["path_order"]:
+        label = entry[1]
+        orig = entry[2] if len(entry) > 2 else None
+        is_group = entry[0] == "group"
+        if is_group and not label and orig:
+            # Blank label on a group token → use orig_name internally
+            parts.append(f"\x00{orig}")  # prefix ensures no collision with real labels
+        else:
+            parts.append(label)
+    header = tuple(parts) if parts else ("",)
+    # Two DISTINCT top-level (space-separated) entries can still produce
+    # identical label text — e.g. "total sex total education total
+    # region" repeats the default 'TOTAL' label three times, and a user
+    # may also deliberately reuse the same explicit label twice. Without
+    # a further discriminator these specs would collapse onto the same
+    # dict key in `cells`/`row_hdr_path`/`col_hdr_path` and silently
+    # overwrite one another, dropping all but the last occurrence.
+    # `spec["branch"]` is the top-level concat branch index (unique per
+    # space-separated entry), so folding it in here keeps same-text
+    # repeats as distinct rows/columns. It is never shown to the user —
+    # display text is built from `path_order` alone in
+    # `_key_to_label_slotted`.
+    return (*header, ("\x00branch", spec["branch"]))
+
+
+def _orig_groups(spec: dict[str, Any]) -> list[str]:
+    return [col for col, _ in spec["group_keys"]]
+
+
+# ---------------------------------------------------------------------------
+# Cell computation
+# ---------------------------------------------------------------------------
+
+
+def _resolve_stat_var(
+    r_spec: dict[str, Any],
+    c_spec: dict[str, Any],
+) -> tuple[str | None, str, Any]:
+    var = r_spec["var"] or c_spec["var"]
+    stat = r_spec["stat"] or c_spec["stat"]
+    if stat is None:
+        stat = "N"
+    # Custom denominator definition from <...> syntax
+    denom_def = r_spec.get("denom_def") or c_spec.get("denom_def")
+    return var, stat, denom_def
+
+
+def _select_series(
+    data: pd.DataFrame,
+    r_spec: dict[str, Any],
+    c_spec: dict[str, Any],
+    r_groups: list[str],
+    c_groups: list[str],
+    var: str | None,
+    stat: str,
+    denom_def: Any,
+    groupby: list[str],
+    measure: list[str],
+    missing: bool,
+    weight: str | None,
+) -> pd.Series:
+    if denom_def is not None and stat.upper() in ("PCTSUM", "PCTN"):
+        # Custom-denominator percentage: route to dedicated function
+        return _compute_custom_pct(
+            data=data,
+            r_groups=r_groups,
+            c_groups=c_groups,
+            var=var,
+            stat=stat,
+            denom_def=denom_def,
+            groupby=groupby,
+            measure=measure,
+            missing=missing,
+            weight=weight,
+            r_path_order=r_spec["path_order"],
+            c_path_order=c_spec["path_order"],
+        )
+
+    groups_union = list(dict.fromkeys(r_groups + c_groups))
+
+    if not r_spec["has_all"] and not c_spec["has_all"]:
+        return _compute_series(
+            data, groups_union, var, stat, r_groups, c_groups, missing, weight=weight
+        )
+
+    # ALL on rows, columns, or both: r_groups/c_groups drive the correct
+    # denominator selection for ROWPCTN/COLPCTN inside _compute_all_series.
+    return _compute_all_series(
+        data,
+        groups_union,
+        var,
+        stat,
+        missing,
+        r_groups=r_groups,
+        c_groups=c_groups,
+        weight=weight,
+    )
+
+
+def _fill_cell(
+    data: pd.DataFrame,
+    cells: dict[Any, dict[Any, Any]],
+    r_spec: dict[str, Any],
+    c_spec: dict[str, Any],
+    r_hdr: Any,
+    c_hdr: Any,
+    r_groups: list[str],
+    c_groups: list[str],
+    groupby: list[str],
+    measure: list[str],
+    missing: bool,
+    weight: str | None,
+) -> None:
+    var, stat, denom_def = _resolve_stat_var(r_spec, c_spec)
+    series = _select_series(
+        data,
+        r_spec,
+        c_spec,
+        r_groups,
+        c_groups,
+        var,
+        stat,
+        denom_def,
+        groupby,
+        measure,
+        missing,
+        weight,
+    )
+    _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
+
+
+def _build_cells(
+    data: pd.DataFrame,
+    row_specs: list[dict[str, Any]],
+    col_specs: list[dict[str, Any]],
+    groupby: list[str],
+    measure: list[str],
+    missing: bool,
+    weight: str | None,
+) -> tuple[
+    dict[Any, dict[Any, Any]],
+    dict[Any, tuple[list[Any], int]],
+    dict[Any, tuple[list[Any], int]],
+]:
+    cells: dict[Any, dict[Any, Any]] = {}
+    row_hdr_path: dict[Any, tuple[list[Any], int]] = {}
+    col_hdr_path: dict[Any, tuple[list[Any], int]] = {}
+
+    for r_spec in row_specs:
+        r_hdr = _spec_header(r_spec)
+        r_groups = _orig_groups(r_spec)
+        row_hdr_path.setdefault(r_hdr, (r_spec["path_order"], r_spec["branch"]))
+
+        for c_spec in col_specs:
+            c_hdr = _spec_header(c_spec)
+            c_groups = _orig_groups(c_spec)
+            col_hdr_path.setdefault(c_hdr, (c_spec["path_order"], c_spec["branch"]))
+
+            _fill_cell(
+                data,
+                cells,
+                r_spec,
+                c_spec,
+                r_hdr,
+                c_hdr,
+                r_groups,
+                c_groups,
+                groupby,
+                measure,
+                missing,
+                weight,
+            )
+
+    return cells, row_hdr_path, col_hdr_path
+
+
+# ---------------------------------------------------------------------------
+# Sort-by value-key helpers
+# ---------------------------------------------------------------------------
+
+
+def _na_safe_str(v: Any) -> str:
+    if v is None or v == _NAN_SENTINEL:
+        return ""
+    try:
+        if isinstance(v, float) and np.isnan(v):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    return str(v)
+
+
+def _index_value_key(
+    orig_col: str | None,
+    v: Any,
+    label_map: dict[str, dict[Any, str]],
+) -> tuple[int, int | str]:
+    """Return the sort key for ``sort_by='index'``.
+
+    Order values by their position in the labels dictionary, using the
+    insertion order provided by the caller.
+
+    Looks up ``v`` only in ``label_map[orig_col]`` (the dictionary belonging
+    to this specific groupby column), never in other columns' label
+    dictionaries, so a raw value like 1 used in two different columns can
+    never borrow the wrong column's label or order.
+
+    Values not present in the label dictionary, or when the column has no
+    label dictionary at all, fall back to their normalised string form and
+    are sorted after all explicitly labelled values.
+    """
+    col_labels = label_map.get(orig_col) if orig_col else None
+    if col_labels and v in col_labels:
+        keys_in_order = list(col_labels.keys())
+        return (0, keys_in_order.index(v))
+    return (1, _na_safe_str(v))
+
+
+def _label_text_value_key(
+    orig_col: str | None,
+    v: Any,
+    label_map: dict[str, dict[Any, str]],
+) -> tuple[int, str]:
+    """Sort key for sort_by='label': order alphabetically by the DISPLAY.
+
+    LABEL TEXT (the dict's value), not by dict-write order and not by
+    the raw code.
+
+    Looks up v ONLY in label_map[orig_col], so values are never resolved
+    against the wrong column's dict. Values without a label fall back
+    to their normalised string form, sorted after all explicitly
+    labelled values.
+    """
+    col_labels = label_map.get(orig_col) if orig_col else None
+    if col_labels and v in col_labels:
+        return (0, str(col_labels[v]))
+    return (1, _na_safe_str(v))
+
+
+def _sort_keys(
+    keys: list[tuple[Any, Any]],
+    hdr_path: dict[Any, tuple[list[Any], int]],
+    sort_by: str,
+    label_map: dict[str, dict[Any, str]],
+) -> list[tuple[Any, Any]]:
+    """Sort row/col keys, respecting sort_by='code', 'index', or 'label'."""
+    if sort_by == "index" and label_map:
+        value_key_fn = partial(_index_value_key, label_map=label_map)
+    elif sort_by == "label" and label_map:
+        value_key_fn = partial(_label_text_value_key, label_map=label_map)
+    else:
+        value_key_fn = None
+    return _sort_row_keys(keys, hdr_path, value_key_fn=value_key_fn)
+
+
+# ---------------------------------------------------------------------------
+# Display-label formatting helpers
+# ---------------------------------------------------------------------------
+
+
+def _fmt_val(
+    v: Any,
+    label_map: dict[str, dict[Any, str]],
+    col_name: str | None = None,
+) -> str:
+    """Format a group key value for display, applying label remapping.
+
+    col_name : the original groupby column this value belongs to. Only
+               that column's label dict (label_map[col_name]) is consulted,
+               so the same raw value (e.g. 1) used in two different
+               groupby columns never gets the wrong column's label.
+               If col_name is None or not in label_map, no remapping
+               is applied beyond the nan/sentinel handling.
+    """
+    if v is None or v == _NAN_SENTINEL:
+        return "nan"
+    if isinstance(v, float):
+        try:
+            if np.isnan(v):
+                return "nan"
+        except (TypeError, ValueError):
+            pass
+    if col_name is not None:
+        col_labels = label_map.get(col_name)
+        if col_labels and v in col_labels:
+            return str(col_labels[v])
+    return str(v)
+
+
+def _compute_slot_layout(
+    all_path_orders: list[list[tuple[Any, ...]]],
+) -> list[int]:
+    """Compute display slots per position across all specs.
+
+    Each cross-position gets:
+      2 slots  if ANY spec has kind='group' there WITH a non-blank label
+               (groupby variables need a label row + a value row)
+      1 slot   otherwise (stat/var/all, or group with label='' suppressed)
+
+    Returns a list of ints, outermost first.
+    """
+    if not all_path_orders:
+        return []
+    max_len = max((len(po) for po in all_path_orders), default=0)
+    slots = []
+    for i in range(max_len):
+        has_labeled_group = any(
+            i < len(po) and po[i][0] == "group" and po[i][1]  # label is non-blank
+            for po in all_path_orders
+        )
+        slots.append(2 if has_labeled_group else 1)
+    return slots
+
+
+def _slot_range(
+    local_pos: int,
+    num_positions: int,
+    slots: list[int],
+    D: int,
+) -> tuple[int, int]:
+    # local_pos is the index within path_order (0 = outermost of THIS spec)
+    # map to the global slots list (bottom-aligned)
+    global_pos = len(slots) - num_positions + local_pos
+    low = sum(slots[global_pos + 1 :])
+    high = low + slots[global_pos] - 1
+    return D - 1 - high, D - 1 - low  # (hi_idx, lo_idx)
+
+
+def _place_group_entry(
+    row: list[str],
+    hi_idx: int,
+    lo_idx: int,
+    label: str,
+    orig_name: str | None,
+    is_total: bool,
+    data_iter: Any,
+    slots: list[int],
+    global_pos: int,
+    label_map: dict[str, dict[Any, str]],
+) -> None:
+    if is_total:
+        return
+    val = next(data_iter, None)
+    val_str = _fmt_val(val, label_map, col_name=orig_name)
+    # In the 2-slot system, every group position has a dedicated
+    # label slot (hi_idx) and value slot (lo_idx). Whether a
+    # group is "preceding" or "last" no longer matters for slot
+    # allocation — both always emit label at hi_idx (if non-blank)
+    # and value at lo_idx. The old "preceding group → value only"
+    # rule was a 1-slot workaround; it dropped labels that now
+    # have their own dedicated row.
+    has_label_slot = slots[global_pos] == 2
+    if label and has_label_slot:
+        row[hi_idx] = label
+    row[lo_idx] = val_str
+
+
+def _key_to_label_slotted(
+    hdr: Any,
+    data_key: Any,
+    path_order: list[tuple[Any, ...]],
+    slots: list[int],
+    label_map: dict[str, dict[Any, str]],
+) -> Any:
+    """Build a fixed-length index tuple using a pre-computed slot layout.
+
+    D = sum(slots) levels total. Slots assigned bottom-up: the innermost
+    (rightmost) path_order position occupies the lowest (rightmost) slots.
+
+    For a spec whose path_order is SHORTER than the full slot list (i.e.
+    it has fewer cross-positions than the deepest spec), its tokens are
+    placed starting at the BOTTOM of the available slots — front-padding
+    with blanks — so that shallower specs always align at the bottom
+    level alongside deeper specs' innermost values.
+
+    Within a position:
+      - stat/var/ALL (1 slot): value -> low slot; high slot blank
+      - group with non-blank label (2 slots): label -> high slot, value -> low slot
+      - group with blank label (1 slot): value -> low slot only (label suppressed)
+    """
+    if not path_order:
+        return hdr
+
+    D = sum(slots)
+    is_total = (not data_key) or data_key == (_SENTINEL,)
+    dvals = (
+        []
+        if is_total
+        else list(data_key if isinstance(data_key, tuple) else (data_key,))
+    )
+    data_iter = iter(dvals)
+
+    row = [""] * D
+    num_positions = len(path_order)
+
+    for pos, entry in enumerate(path_order):
+        kind = entry[0]
+        label = entry[1]
+        orig_name = entry[2] if len(entry) > 2 else None
+        hi_idx, lo_idx = _slot_range(pos, num_positions, slots, D)
+
+        if kind != "group":
+            row[lo_idx] = label
+        else:
+            global_pos = len(slots) - num_positions + pos
+            _place_group_entry(
+                row,
+                hi_idx,
+                lo_idx,
+                label,
+                orig_name,
+                is_total,
+                data_iter,
+                slots,
+                global_pos,
+                label_map,
+            )
+
+    return tuple(row) if any(row) else ("",)
+
+
+def _drop_blank_levels(labels: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
+    """Drop index levels that are blank in every row."""
+    if labels and len(labels[0]) > 1:
+        keep = [i for i in range(len(labels[0])) if any(t[i] for t in labels)]
+        if len(keep) < len(labels[0]):
+            labels = [tuple(t[i] for i in keep) for t in labels]
+    return labels
+
+
+def _make_index(
+    keys: list[tuple[Any, Any]],
+    hdr_path: dict[Any, tuple[list[Any], int]],
+    label_map: dict[str, dict[Any, str]],
+) -> pd.Index:
+    """Convert header/data-key pairs to an index using slot-based layout.
+
+    Every specification in the dimension produces a fixed-length tuple of the
+    same depth, ``D = sum(slots)``, where the slot layout is computed globally
+    so that all specifications align correctly:
+
+    - Groupby variables occupy two slots: one label row and one value row.
+    - Statistic, measure, and ALL/TOTAL tokens occupy one slot each.
+    - Shorter specifications are bottom-aligned and front-padded with blanks
+    so their innermost token lands at the same absolute level as the
+    innermost token of deeper specifications.
+
+    After building the tuples, any level that is blank across all columns is
+    dropped. These blank levels are structural artefacts, for example the
+    label slot of a group whose label was suppressed with ``=''``.
+
+    Parameters
+    ----------
+    keys : list[tuple[Any, Any]]
+        Sequence of ``(header, data_key)`` pairs to convert to index labels.
+    hdr_path : dict[Any, tuple[list[Any], int]]
+        Mapping from each header to its path-order metadata and top-level
+        branch index.
+    label_map : dict[str, dict[Any, str]]
+        Mapping from groupby column name to a display-label dictionary.
+
+    Returns
+    -------
+    pd.Index
+        An Index or MultiIndex containing the aligned display labels.
+
+    Examples
+    --------
+    The expression ``n colpctn*(all age_group)`` produces specifications such
+    as::
+
+        [stat:N]
+        [stat:COLPCTN, all:TOTAL]
+        [stat:COLPCTN, group:age_group]
+
+    Their logical labels are::
+
+        ('N',)
+        ('COLPCTN', 'TOTAL')
+        ('COLPCTN', 'age_group', '10-19')
+
+    The slot layout has one slot for the statistic position and two slots for
+    the group/ALL position because ``age_group`` has a non-blank label. This
+    gives ``D = 3``.
+
+    After bottom alignment and removal of levels that are blank everywhere,
+    the entries align so that totals and group values occupy the same logical
+    positions.
+
+    The expression ``origin * (type total='Subtotal')`` similarly produces::
+
+        [group:origin, group:type]
+        [group:origin, all:Subtotal]
+
+    which can be represented as::
+
+        ('origin', 'Asia', 'type', 'SUV')
+        ('origin', 'Asia', 'Subtotal', '')
+
+    Both have the same slot depth, so ``'Asia'`` remains vertically aligned
+    between detail and subtotal rows.
+    """
+    all_po = [hdr_path.get(hdr, ([], 0))[0] for hdr, _ in keys]
+    slots = _compute_slot_layout(all_po)
+    D = sum(slots)
+
+    if D == 0:
+        return pd.Index([""] * len(keys))
+
+    labels = [
+        _key_to_label_slotted(
+            hdr,
+            dk,
+            hdr_path.get(hdr, ([], 0))[0],
+            slots,
+            label_map,
+        )
+        for hdr, dk in keys
+    ]
+
+    labels = _drop_blank_levels(labels)
+
+    n_levels = len(labels[0]) if labels else 0
+    if n_levels == 0:
+        return pd.Index([""] * len(keys))
+    if n_levels == 1:
+        return cast(pd.Index, pd.Index([t[0] for t in labels]))
+    return pd.MultiIndex.from_tuples(labels)
+
+
+# ---------------------------------------------------------------------------
+# Format-map / matrix / result assembly
+# ---------------------------------------------------------------------------
+
+
+def _build_fmt_map(
+    keys: list[tuple[Any, Any]],
+    specs: list[dict[str, Any]],
+) -> dict[int, Callable[[Any], str]]:
+    """Map key position -> formatter callable for a dimension's format= specs."""
+    fmt_map: dict[int, Callable[[Any], str]] = {}
+    for i, key in enumerate(keys):
+        hdr, _ = key
+        for spec in specs:
+            if _spec_header(spec) == hdr and spec.get("fmt"):
+                fmt_map[i] = _parse_fmt_spec(spec["fmt"])
+                break
+    return fmt_map
+
+
+def _build_matrix(
+    cells: dict[Any, dict[Any, Any]],
+    all_row_keys: list[tuple[Any, Any]],
+    all_col_keys: list[tuple[Any, Any]],
+) -> np.ndarray:
+    matrix = np.full((len(all_row_keys), len(all_col_keys)), np.nan)
+    rk_pos = {rk: i for i, rk in enumerate(all_row_keys)}
+    ck_pos = {ck: j for j, ck in enumerate(all_col_keys)}
+
+    for rk, col_dict in cells.items():
+        for ck, val in col_dict.items():
+            matrix[rk_pos[rk], ck_pos[ck]] = val
+
+    return matrix
+
+
+def _apply_na_rep(base: pd.DataFrame, na_rep: str | None) -> pd.DataFrame:
+    # Replace NaN cells with na_rep text when requested.
+    if na_rep is None:
+        return base
+    base = base.astype(object)
+    # na_rep forces object dtype -> col_fmt_map can't be applied to numerics
+    # reliably anymore for the repr path, but flextab_to_string still works
+    # via pd.isna() check before formatting.
+    return base.where(base.notna(), other=na_rep)
+
+
+def _apply_row_header(result: FlextabResult, row_header: str | None) -> None:
+    # Apply row_header: name the row index so it prints as a column label
+    if row_header is None:
+        return
+    if isinstance(result.index, pd.MultiIndex):
+        result.index.names = [row_header, *result.index.names[1:]]
+    else:
+        result.index.name = row_header
+
+
+def _build_result(
+    base: pd.DataFrame,
+    col_fmt_map: dict[int, Callable[[Any], str]],
+    row_fmt_map: dict[int, Callable[[Any], str]],
+    fmt: str,
+    style: dict[str, Any] | None,
+    na_rep: str | None,
+    row_header: str | None,
+) -> FlextabResult:
+    base = _apply_na_rep(base, na_rep)
+
+    result = FlextabResult(base)
+    result.attrs["col_fmt_map"] = col_fmt_map
+    result.attrs["row_fmt_map"] = row_fmt_map
+    result.attrs["default_fmt"] = fmt
+    result.attrs["style"] = style or {}
+
+    _apply_row_header(result, row_header)
+
+    return result
 
 
 def flextab(
@@ -427,24 +1125,7 @@ def flextab(
                 "row_header_bg": "#4472C4",
                 "row_header_fg": "white",
                 "cell_bg": ("white", "#EBF3FB"),
-            }ning the denominator is the subtotal obtained
-          by collapsing that class variable.
-        - ``ALL`` or ``TOTAL``, meaning the grand total.
-
-        When several denominator tokens are supplied, the token matching the
-        current subtable is preferred, with later tokens available as
-        fallbacks.
-
-        Examples include::
-
-            tax*pctsum<income>
-
-        which expresses tax as a percentage of income, and::
-
-            income*pctsum<gender all>
-
-        which uses a gender subtotal where applicable and ``ALL`` as a
-        fallback.
+            }
 
     Returns
     -------
@@ -459,562 +1140,217 @@ def flextab(
         formatting and colour styling. Use ``flextab_to_string()`` or
         ``flextab_to_markdown()`` for explicit textual rendering.
     """
-    # Allow passing a single column name as a plain string instead of a
-    # one-element list, e.g. measure="income" instead of measure=["income"].
-    if isinstance(measure, str):
-        measure = [measure]
-    if isinstance(groupby, str):
-        groupby = [groupby]
-
-    measure = measure or []
-    groupby = groupby or []
+    measure, groupby = _normalize_measure_groupby(measure, groupby)
     missing = include_missing_in_groupby
-    labels = labels or {}
     # Flat lookup: original_value -> display_label for any groupby column.
-    # Used by _fmt_val inside _key_to_label to remap codes to labels.
-    _label_map = labels  # kept separate so groupby always uses original codes
+    # Used by _fmt_val (via _make_index) to remap codes to labels, and by
+    # _sort_keys for sort_by='index'/'label'.
+    label_map = labels or {}
 
     if table is None:
-        if measure:
-            if groupby:
-                row_expr = " ".join(groupby)
-                col_expr = " ".join(f"{v} * (N MEAN)" for v in measure)
-                table = f"{row_expr}, {col_expr}"
-            else:
-                table = " ".join(f"{v} * (N MEAN)" for v in measure)
-        else:
-            if groupby:
-                row_expr = " ".join(groupby)
-                table = f"{row_expr}, N"
-            else:
-                table = "N"
+        table = _default_table_expr(measure, groupby)
 
     dims = parse_table(table)
-    if len(dims) == 1:
-        row_dim, col_dim = None, dims[0]
-    else:
-        row_dim, col_dim = dims[0], dims[1]
+    row_dim, col_dim = _split_dims(dims)
 
-    def expand_dim(dim_node: DimNode | None) -> list[dict[str, Any]]:
-        if dim_node is None:
-            return [
-                {
-                    "group_keys": [],
-                    "var": None,
-                    "var_label": None,
-                    "stat": None,
-                    "stat_label": None,
-                    "has_all": False,
-                    "all_label": None,
-                    "path_order": [],
-                    "branch": 0,
-                }
-            ]
-        specs = []
-        for branch_idx, path in _expand_node_with_branch(dim_node):
-            spec = _classify_path(path, measure, groupby)
-            spec["branch"] = branch_idx
-            specs.append(spec)
-        return specs
+    col_specs = _expand_dim(col_dim, measure, groupby)
+    row_specs = _expand_dim(row_dim, measure, groupby)
 
-    col_specs = expand_dim(col_dim)
-    row_specs = expand_dim(row_dim)
-
-    def spec_header(spec: dict[str, Any]) -> tuple[Any, ...]:
-        # Build a header tuple that uniquely identifies this spec.
-        # For group entries, use the label when non-blank.
-        # When the label is blank (suppressed with =''), fall back to the
-        # original column name so that e.g. origin='' and type='' produce
-        # distinct headers ('origin',) and ('type',) rather than both
-        # collapsing to ('',), which would cause sorting to treat all their
-        # values as belonging to the same spec and sort them together.
-        # The orig_name is used ONLY as an internal discriminator here —
-        # it does not affect what gets displayed in the table header.
-        parts = []
-        for entry in spec["path_order"]:
-            label = entry[1]
-            orig = entry[2] if len(entry) > 2 else None
-            is_group = entry[0] == "group"
-            if is_group and not label and orig:
-                # Blank label on a group token → use orig_name internally
-                parts.append(
-                    f"\x00{orig}"
-                )  # prefix ensures no collision with real labels
-            else:
-                parts.append(label)
-        header = tuple(parts) if parts else ("",)
-        # Two DISTINCT top-level (space-separated) entries can still produce
-        # identical label text — e.g. "total sex total education total
-        # region" repeats the default 'TOTAL' label three times, and a user
-        # may also deliberately reuse the same explicit label twice. Without
-        # a further discriminator these specs would collapse onto the same
-        # dict key in `cells`/`row_hdr_path`/`col_hdr_path` and silently
-        # overwrite one another, dropping all but the last occurrence.
-        # `spec["branch"]` is the top-level concat branch index (unique per
-        # space-separated entry), so folding it in here keeps same-text
-        # repeats as distinct rows/columns. It is never shown to the user —
-        # display text is built from `path_order` alone in
-        # `_key_to_label_slotted`.
-        return (*header, ("\x00branch", spec["branch"]))
-
-    def orig_groups(spec: dict[str, Any]) -> list[str]:
-        return [col for col, _ in spec["group_keys"]]
-
-    cells: dict[Any, dict[Any, Any]] = {}
-    row_hdr_path: dict[Any, tuple[list[Any], int]] = {}
-    col_hdr_path: dict[Any, tuple[list[Any], int]] = {}
-
-    for r_spec in row_specs:
-        r_hdr = spec_header(r_spec)
-        r_groups = orig_groups(r_spec)
-        row_hdr_path.setdefault(r_hdr, (r_spec["path_order"], r_spec["branch"]))
-
-        for c_spec in col_specs:
-            c_hdr = spec_header(c_spec)
-            c_groups = orig_groups(c_spec)
-            col_hdr_path.setdefault(c_hdr, (c_spec["path_order"], c_spec["branch"]))
-
-            var = r_spec["var"] or c_spec["var"]
-            stat = r_spec["stat"] or c_spec["stat"]
-
-            if stat is None:
-                stat = "N"
-
-            # Custom denominator definition from <...> syntax
-            denom_def = r_spec.get("denom_def") or c_spec.get("denom_def")
-
-            all_groups = list(dict.fromkeys(r_groups + c_groups))
-
-            has_all_r = r_spec["has_all"]
-            has_all_c = c_spec["has_all"]
-
-            if denom_def is not None and stat.upper() in ("PCTSUM", "PCTN"):
-                # Custom-denominator percentage: route to dedicated function
-                series = _compute_custom_pct(
-                    data=data,
-                    r_groups=r_groups,
-                    c_groups=c_groups,
-                    var=var,
-                    stat=stat,
-                    denom_def=denom_def,
-                    groupby=groupby,
-                    measure=measure,
-                    missing=missing,
-                    weight=weight,
-                    r_path_order=r_spec["path_order"],
-                    c_path_order=c_spec["path_order"],
-                )
-                _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
-
-            elif not has_all_r and not has_all_c:
-                series = _compute_series(
-                    data,
-                    all_groups,
-                    var,
-                    stat,
-                    r_groups,
-                    c_groups,
-                    missing,
-                    weight=weight,
-                )
-                _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
-
-            elif has_all_r and not has_all_c:
-                # ALL on rows: c_groups drive the column denominator for COLPCTN
-                keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(
-                    data,
-                    keep,
-                    var,
-                    stat,
-                    missing,
-                    r_groups=r_groups,
-                    c_groups=c_groups,
-                    weight=weight,
-                )
-                _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
-
-            elif not has_all_r and has_all_c:
-                # ALL on cols: r_groups drive the row denominator for ROWPCTN
-                keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(
-                    data,
-                    keep,
-                    var,
-                    stat,
-                    missing,
-                    r_groups=r_groups,
-                    c_groups=c_groups,
-                    weight=weight,
-                )
-                _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
-
-            else:
-                # ALL on both: pass both for correct denominator selection
-                keep = list(dict.fromkeys(r_groups + c_groups))
-                series = _compute_all_series(
-                    data,
-                    keep,
-                    var,
-                    stat,
-                    missing,
-                    r_groups=r_groups,
-                    c_groups=c_groups,
-                    weight=weight,
-                )
-                _fill_cells(cells, series, r_hdr, c_hdr, r_groups, c_groups)
-
-    def _index_value_key(
-        orig_col: str | None,
-        v: Any,
-    ) -> tuple[int, int | str]:
-        """Return the sort key for ``sort_by='index'``.
-
-        Order values by their position in the labels dictionary, using the
-        insertion order provided by the caller.
-
-        Looks up ``v`` only in ``labels[orig_col]`` (the dictionary belonging to
-        this specific groupby column), never in other columns' label dictionaries,
-        so a raw value like 1 used in two different columns can never borrow the
-        wrong column's label or order.
-
-        Values not present in the label dictionary, or when the column has no
-        label dictionary at all, fall back to their normalised string form and
-        are sorted after all explicitly labelled values.
-        """
-        col_labels = _label_map.get(orig_col) if orig_col else None
-        if col_labels and v in col_labels:
-            keys_in_order = list(col_labels.keys())
-            return (0, keys_in_order.index(v))
-        return (1, _na_safe_str(v))
-
-    def _label_text_value_key(
-        orig_col: str | None,
-        v: Any,
-    ) -> tuple[int, str]:
-        """Sort key for sort_by='label': order alphabetically by the DISPLAY.
-
-        LABEL TEXT (the dict's value), not by dict-write order and not by
-        the raw code.
-
-        Looks up v ONLY in labels[orig_col], so values are never resolved
-        against the wrong column's dict. Values without a label fall back
-        to their normalised string form, sorted after all explicitly
-        labelled values.
-        """
-        col_labels = _label_map.get(orig_col) if orig_col else None
-        if col_labels and v in col_labels:
-            return (0, str(col_labels[v]))
-        return (1, _na_safe_str(v))
-
-    def _na_safe_str(v: Any) -> str:
-        if v is None or v == _NAN_SENTINEL:
-            return ""
-        try:
-            if isinstance(v, float) and np.isnan(v):
-                return ""
-        except (TypeError, ValueError):
-            pass
-        return str(v)
-
-    def _sort_keys(
-        keys: list[tuple[Any, Any]],
-        hdr_path: dict[Any, tuple[list[Any], int]],
-    ) -> list[tuple[Any, Any]]:
-        """Sort row/col keys, respecting sort_by='code', 'index', or 'label'."""
-        if sort_by == "index" and _label_map:
-            value_key_fn = _index_value_key
-        elif sort_by == "label" and _label_map:
-            value_key_fn = _label_text_value_key
-        else:
-            value_key_fn = None
-        return _sort_row_keys(keys, hdr_path, value_key_fn=value_key_fn)
-
-    all_row_keys = _sort_keys(list(dict.fromkeys(rk for rk in cells)), row_hdr_path)
-    all_col_keys = _sort_keys(
-        list(dict.fromkeys(ck for rk in cells for ck in cells[rk])), col_hdr_path
+    cells, row_hdr_path, col_hdr_path = _build_cells(
+        data, row_specs, col_specs, groupby, measure, missing, weight
     )
 
-    matrix = np.full((len(all_row_keys), len(all_col_keys)), np.nan)
-    rk_pos = {rk: i for i, rk in enumerate(all_row_keys)}
-    ck_pos = {ck: j for j, ck in enumerate(all_col_keys)}
+    all_row_keys = _sort_keys(
+        list(dict.fromkeys(rk for rk in cells)), row_hdr_path, sort_by, label_map
+    )
+    all_col_keys = _sort_keys(
+        list(dict.fromkeys(ck for rk in cells for ck in cells[rk])),
+        col_hdr_path,
+        sort_by,
+        label_map,
+    )
 
-    for rk, col_dict in cells.items():
-        for ck, val in col_dict.items():
-            matrix[rk_pos[rk], ck_pos[ck]] = val
+    matrix = _build_matrix(cells, all_row_keys, all_col_keys)
 
-    def _fmt_val(
-        v: Any,
-        col_name: str | None = None,
-    ) -> str:
-        """Format a group key value for display, applying label remapping.
+    # Build column-format and row-format maps: index position -> formatter
+    # callable, sourced from each spec's format= specification (if any).
+    col_fmt_map = _build_fmt_map(all_col_keys, col_specs)
+    row_fmt_map = _build_fmt_map(all_row_keys, row_specs)
 
-        col_name : the original groupby column this value belongs to. Only
-                   that column's label dict (labels[col_name]) is consulted,
-                   so the same raw value (e.g. 1) used in two different
-                   groupby columns never gets the wrong column's label.
-                   If col_name is None or not in _label_map, no remapping
-                   is applied beyond the nan/sentinel handling.
-        """
-        if v is None or v == _NAN_SENTINEL:
-            return "nan"
-        if isinstance(v, float):
-            try:
-                if np.isnan(v):
-                    return "nan"
-            except (TypeError, ValueError):
-                pass
-        if col_name is not None:
-            col_labels = _label_map.get(col_name)
-            if col_labels and v in col_labels:
-                return str(col_labels[v])
-        return str(v)
-
-    def _compute_slot_layout(
-        all_path_orders: list[list[tuple[Any, ...]]],
-    ) -> list[int]:
-        """Compute display slots per position across all specs.
-
-        Each cross-position gets:
-          2 slots  if ANY spec has kind='group' there WITH a non-blank label
-                   (groupby variables need a label row + a value row)
-          1 slot   otherwise (stat/var/all, or group with label='' suppressed)
-
-        Returns a list of ints, outermost first.
-        """
-        if not all_path_orders:
-            return []
-        max_len = max((len(po) for po in all_path_orders), default=0)
-        slots = []
-        for i in range(max_len):
-            has_labeled_group = any(
-                i < len(po) and po[i][0] == "group" and po[i][1]  # label is non-blank
-                for po in all_path_orders
-            )
-            slots.append(2 if has_labeled_group else 1)
-        return slots
-
-    def _key_to_label_slotted(
-        hdr: Any,
-        data_key: Any,
-        path_order: list[tuple[Any, ...]],
-        slots: list[int],
-    ) -> Any:
-        """Build a fixed-length index tuple using a pre-computed slot layout.
-
-        D = sum(slots) levels total. Slots assigned bottom-up: the innermost
-        (rightmost) path_order position occupies the lowest (rightmost) slots.
-
-        For a spec whose path_order is SHORTER than the full slot list (i.e.
-        it has fewer cross-positions than the deepest spec), its tokens are
-        placed starting at the BOTTOM of the available slots — front-padding
-        with blanks — so that shallower specs always align at the bottom
-        level alongside deeper specs' innermost values.
-
-        Within a position:
-          - stat/var/ALL (1 slot): value -> low slot; high slot blank
-          - group with non-blank label (2 slots): label -> high slot, value -> low slot
-          - group with blank label (1 slot): value -> low slot only (label suppressed)
-        """
-        if not path_order:
-            return hdr
-
-        D = sum(slots)
-        is_total = (not data_key) or data_key == (_SENTINEL,)
-        dvals = (
-            []
-            if is_total
-            else list(data_key if isinstance(data_key, tuple) else (data_key,))
-        )
-        data_iter = iter(dvals)
-
-        row = [""] * D
-
-        def slot_range(local_pos: int) -> tuple[int, int]:
-            # local_pos is the index within path_order (0 = outermost of THIS spec)
-            # map to the global slots list (bottom-aligned)
-            global_pos = len(slots) - len(path_order) + local_pos
-            low = sum(slots[global_pos + 1 :])
-            high = low + slots[global_pos] - 1
-            return D - 1 - high, D - 1 - low  # (hi_idx, lo_idx)
-
-        for pos, entry in enumerate(path_order):
-            kind = entry[0]
-            label = entry[1]
-            orig_name = entry[2] if len(entry) > 2 else None
-            hi_idx, lo_idx = slot_range(pos)
-
-            if kind != "group":
-                row[lo_idx] = label
-            else:
-                if is_total:
-                    pass
-                else:
-                    val = next(data_iter, None)
-                    val_str = _fmt_val(val, col_name=orig_name)
-                    global_pos = len(slots) - len(path_order) + pos
-                    has_label_slot = slots[global_pos] == 2
-                    # In the 2-slot system, every group position has a dedicated
-                    # label slot (hi_idx) and value slot (lo_idx). Whether a
-                    # group is "preceding" or "last" no longer matters for slot
-                    # allocation — both always emit label at hi_idx (if non-blank)
-                    # and value at lo_idx. The old "preceding group → value only"
-                    # rule was a 1-slot workaround; it dropped labels that now
-                    # have their own dedicated row.
-                    if label and has_label_slot:
-                        row[hi_idx] = label
-                    row[lo_idx] = val_str
-
-        return tuple(row) if any(row) else ("",)
-
-    def make_index(
-        keys: list[tuple[Any, Any]],
-        hdr_path: dict[Any, tuple[list[Any], int]],
-    ) -> pd.Index:
-        """Convert header/data-key pairs to an index using slot-based layout.
-
-        Every specification in the dimension produces a fixed-length tuple of the
-        same depth, ``D = sum(slots)``, where the slot layout is computed globally
-        so that all specifications align correctly:
-
-        - Groupby variables occupy two slots: one label row and one value row.
-        - Statistic, measure, and ALL/TOTAL tokens occupy one slot each.
-        - Shorter specifications are bottom-aligned and front-padded with blanks
-        so their innermost token lands at the same absolute level as the
-        innermost token of deeper specifications.
-
-        After building the tuples, any level that is blank across all columns is
-        dropped. These blank levels are structural artefacts, for example the
-        label slot of a group whose label was suppressed with ``=''``.
-
-        Parameters
-        ----------
-        keys : list[tuple[Any, Any]]
-            Sequence of ``(header, data_key)`` pairs to convert to index labels.
-        hdr_path : dict[Any, tuple[list[Any], int]]
-            Mapping from each header to its path-order metadata and top-level
-            branch index.
-
-        Returns
-        -------
-        pd.Index
-            An Index or MultiIndex containing the aligned display labels.
-
-        Examples
-        --------
-        The expression ``n colpctn*(all age_group)`` produces specifications such
-        as::
-
-            [stat:N]
-            [stat:COLPCTN, all:TOTAL]
-            [stat:COLPCTN, group:age_group]
-
-        Their logical labels are::
-
-            ('N',)
-            ('COLPCTN', 'TOTAL')
-            ('COLPCTN', 'age_group', '10-19')
-
-        The slot layout has one slot for the statistic position and two slots for
-        the group/ALL position because ``age_group`` has a non-blank label. This
-        gives ``D = 3``.
-
-        After bottom alignment and removal of levels that are blank everywhere,
-        the entries align so that totals and group values occupy the same logical
-        positions.
-
-        The expression ``origin * (type total='Subtotal')`` similarly produces::
-
-            [group:origin, group:type]
-            [group:origin, all:Subtotal]
-
-        which can be represented as::
-
-            ('origin', 'Asia', 'type', 'SUV')
-            ('origin', 'Asia', 'Subtotal', '')
-
-        Both have the same slot depth, so ``'Asia'`` remains vertically aligned
-        between detail and subtotal rows.
-        """
-        all_po = [hdr_path.get(hdr, ([], 0))[0] for hdr, _ in keys]
-        slots = _compute_slot_layout(all_po)
-        D = sum(slots)
-
-        if D == 0:
-            return pd.Index([""] * len(keys))
-
-        labels = [
-            _key_to_label_slotted(
-                hdr,
-                dk,
-                hdr_path.get(hdr, ([], 0))[0],
-                slots,
-            )
-            for hdr, dk in keys
-        ]
-
-        # Drop levels that are blank in every column
-        if labels and len(labels[0]) > 1:
-            keep = [i for i in range(len(labels[0])) if any(t[i] for t in labels)]
-            if len(keep) < len(labels[0]):
-                labels = [tuple(t[i] for i in keep) for t in labels]
-
-        D_final = len(labels[0]) if labels else 0
-        if D_final == 0:
-            return pd.Index([""] * len(keys))
-        if D_final == 1:
-            return cast(pd.Index, pd.Index([t[0] for t in labels]))
-        return pd.MultiIndex.from_tuples(labels)
-
-    row_idx = make_index(all_row_keys, row_hdr_path)
-    col_idx = make_index(all_col_keys, col_hdr_path)
+    row_idx = _make_index(all_row_keys, row_hdr_path, label_map)
+    col_idx = _make_index(all_col_keys, col_hdr_path, label_map)
 
     base = pd.DataFrame(matrix, index=row_idx, columns=col_idx)
 
-    # Build a column-format map: col_index_position -> formatter callable.
-    # Each column spec may carry a fmt spec from the TABLE expression.
-    col_fmt_map = {}
-    for j, ck in enumerate(all_col_keys):
-        c_hdr, _ = ck
-        for c_spec in col_specs:
-            if spec_header(c_spec) == c_hdr and c_spec.get("fmt"):
-                col_fmt_map[j] = _parse_fmt_spec(c_spec["fmt"])
-                break
+    return _build_result(base, col_fmt_map, row_fmt_map, fmt, style, na_rep, row_header)
 
-    # Build a row-format map: row_index_position -> formatter callable.
-    # Each row spec may carry a fmt spec from the TABLE expression (e.g.
-    # when the statistic with format= lives in the row dimension instead
-    # of the column dimension, as in "n*format=6,0 rowpctn*format=7,1, ...").
-    row_fmt_map = {}
-    for i, rk in enumerate(all_row_keys):
-        r_hdr, _ = rk
-        for r_spec in row_specs:
-            if spec_header(r_spec) == r_hdr and r_spec.get("fmt"):
-                row_fmt_map[i] = _parse_fmt_spec(r_spec["fmt"])
-                break
 
-    # Replace NaN cells with na_rep text when requested.
-    if na_rep is not None:
-        base = base.astype(object)
-        base = base.where(base.notna(), other=na_rep)
-        # na_rep forces object dtype -> col_fmt_map can't be applied to numerics
-        # reliably anymore for the repr path, but flextab_to_string still works
-        # via pd.isna() check before formatting.
+# ---------------------------------------------------------------------------
+# Row/column key ordering
+# ---------------------------------------------------------------------------
 
-    result = FlextabResult(base)
-    result.attrs["col_fmt_map"] = col_fmt_map
-    result.attrs["row_fmt_map"] = row_fmt_map
-    result.attrs["default_fmt"] = fmt
-    result.attrs["style"] = style or {}
 
-    # Apply row_header: name the row index so it prints as a column label
-    if row_header is not None:
-        if isinstance(result.index, pd.MultiIndex):
-            result.index.names = [row_header, *result.index.names[1:]]
-        else:
-            result.index.name = row_header
+def _get_path_order(hdr: Any, hdr_path: dict[Any, tuple[list[Any], int]]) -> list[Any]:
+    entry: tuple[list[Any], int] = hdr_path.get(hdr, ([], 0))
+    return entry[0]
 
-    return result
+
+def _get_branch(hdr: Any, hdr_path: dict[Any, tuple[list[Any], int]]) -> int:
+    entry: tuple[list[Any], int] = hdr_path.get(hdr, ([], 0))
+    return entry[1]
+
+
+def _compute_position_group_flags(
+    row_keys: list[tuple[Any, Any]],
+    hdr_path: dict[Any, tuple[list[Any], int]],
+) -> tuple[int, dict[int, bool]]:
+    """Determine the max path length and which positions hold a real groupby var."""
+    max_len = 0
+    is_group_position: dict[int, bool] = {}
+    for hdr, _ in row_keys:
+        po = _get_path_order(hdr, hdr_path)
+        max_len = max(max_len, len(po))
+        for i, entry in enumerate(po):
+            if entry[0] == "group":
+                is_group_position[i] = True
+            else:
+                is_group_position.setdefault(i, False)
+    return max_len, is_group_position
+
+
+def _compute_label_order(
+    row_keys: list[tuple[Any, Any]],
+    hdr_path: dict[Any, tuple[list[Any], int]],
+    is_group_position: dict[int, bool],
+) -> dict[int, dict[int, dict[Any, int]]]:
+    """Assign a first-seen ordinal to each STAT/VAR label, scoped per branch.
+
+    IMPORTANT: this must be scoped PER BRANCH, not globally across the
+    whole dimension. Each top-level concatenated piece of the TABLE
+    expression (e.g. "sum*w n*format=... colpctn*format=... (SUM
+    COLPCTSUM n nmiss ...)*format=...*income") is its own branch, and the
+    branch index already determines their relative order (branch is the
+    primary sort key, compared before any of this). If label_order were
+    shared globally, a stat name seen early in one branch (e.g. a
+    standalone "n*format=6,0") would claim a low ordinal that then leaks
+    into an unrelated later branch containing the SAME stat name again
+    (e.g. "n" inside "(SUM COLPCTSUM n nmiss ...)"), silently reordering
+    that branch's internal stats to match the EARLIER branch's first
+    appearance instead of THIS branch's own written order.
+    """
+    label_order: dict[int, dict[int, dict[Any, int]]] = {}
+    for hdr, _ in row_keys:
+        po = _get_path_order(hdr, hdr_path)
+        branch = _get_branch(hdr, hdr_path)
+        branch_orders = label_order.setdefault(branch, {})
+        for i, entry in enumerate(po):
+            if not is_group_position.get(i, False):
+                d = branch_orders.setdefault(i, {})
+                if entry[1] not in d:
+                    d[entry[1]] = len(d)
+    return label_order
+
+
+def _compute_col_ordinal(
+    row_keys: list[tuple[Any, Any]],
+    hdr_path: dict[Any, tuple[list[Any], int]],
+    is_group_position: dict[int, bool],
+) -> dict[int, dict[Any, int]]:
+    """For each group-position, order the distinct original column names.
+
+    Computed in first-seen order across all specs. Specs sharing the
+    same orig_col at a given position should have their values sorted
+    together (e.g. all origin values); specs with different orig_cols at
+    that position should be fully separated (e.g. gender block then
+    age_group block, even when they share value strings like '1' and '2').
+    """
+    pos_col_ordinal: dict[int, dict[Any, int]] = {}
+    for hdr, _ in row_keys:
+        po = _get_path_order(hdr, hdr_path)
+        for i, entry in enumerate(po):
+            if is_group_position.get(i, False) and entry[0] == "group":
+                orig_col = entry[2] if len(entry) > 2 else entry[1]
+                d = pos_col_ordinal.setdefault(i, {})
+                if orig_col not in d:
+                    d[orig_col] = len(d)
+    return pos_col_ordinal
+
+
+def _value_sort_key(
+    orig_col: str | None,
+    v: Any,
+    value_key_fn: Callable[[str | None, Any], tuple[int, int | str]] | None,
+) -> Any:
+    if value_key_fn is not None:
+        return value_key_fn(orig_col, v)
+    return _na_safe_str(v)
+
+
+def _row_sort_part(
+    i: int,
+    po: list[Any],
+    is_group_position: dict[int, bool],
+    pos_col_ordinal: dict[int, dict[Any, int]],
+    label_order: dict[int, dict[int, dict[Any, int]]],
+    branch: int,
+    dk_iter: Any,
+    value_key_fn: Callable[[str | None, Any], tuple[int, int | str]] | None,
+) -> tuple[Any, ...]:
+    """Build one element of a row/col sort key, for cross-position ``i``."""
+    if i >= len(po):
+        return (0, 0, "")
+
+    entry = po[i]
+
+    if not is_group_position.get(i, False):
+        ordinal = label_order.get(branch, {}).get(i, {}).get(entry[1], 0)
+        return (ordinal,)
+
+    if entry[0] != "group":
+        # ALL/TOTAL at a group position: sort first within its col_ord=0
+        return (0, 0, "")
+
+    val = next(dk_iter, "")
+    orig_col = entry[2] if len(entry) > 2 else None
+    # col_ord separates specs whose position-i variables differ
+    # (e.g. gender vs age_group both at position 1).
+    # Specs sharing the same orig_col at this position compare
+    # by value alone (col_ord ties → compare val).
+    col_ord = pos_col_ordinal.get(i, {}).get(orig_col, 0)
+    return (1, col_ord, _value_sort_key(orig_col, val, value_key_fn))
+
+
+def _row_sort_key(
+    rk: tuple[Any, Any],
+    hdr_path: dict[Any, tuple[list[Any], int]],
+    max_len: int,
+    is_group_position: dict[int, bool],
+    pos_col_ordinal: dict[int, dict[Any, int]],
+    label_order: dict[int, dict[int, dict[Any, int]]],
+    value_key_fn: Callable[[str | None, Any], tuple[int, int | str]] | None,
+) -> tuple[Any, ...]:
+    hdr, dk = rk
+    po = _get_path_order(hdr, hdr_path)
+    branch = _get_branch(hdr, hdr_path)
+
+    if dk == (_SENTINEL,):
+        dk = ()
+
+    dk_iter = iter(dk if isinstance(dk, tuple) else (dk,))
+    parts = [
+        _row_sort_part(
+            i,
+            po,
+            is_group_position,
+            pos_col_ordinal,
+            label_order,
+            branch,
+            dk_iter,
+            value_key_fn,
+        )
+        for i in range(max_len)
+    ]
+    return (branch, *parts)
 
 
 def _sort_row_keys(
@@ -1071,124 +1407,21 @@ def _sort_row_keys(
     """
     hdr_path = hdr_path or {}
 
-    def _normalise(v: Any) -> str:
-        if v is None or v == _NAN_SENTINEL:
-            return ""
-        try:
-            if isinstance(v, float) and np.isnan(v):
-                return ""
-        except (TypeError, ValueError):
-            pass
-        return str(v)
+    max_len, is_group_position = _compute_position_group_flags(row_keys, hdr_path)
+    label_order = _compute_label_order(row_keys, hdr_path, is_group_position)
+    pos_col_ordinal = _compute_col_ordinal(row_keys, hdr_path, is_group_position)
 
-    def _value_key(orig_col: str | None, v: Any) -> Any:
-        if value_key_fn is not None:
-            return value_key_fn(orig_col, v)
-        return _normalise(v)
+    key_fn = partial(
+        _row_sort_key,
+        hdr_path=hdr_path,
+        max_len=max_len,
+        is_group_position=is_group_position,
+        pos_col_ordinal=pos_col_ordinal,
+        label_order=label_order,
+        value_key_fn=value_key_fn,
+    )
 
-    def _po(hdr: Any) -> list[Any]:
-        entry: tuple[list[Any], int] = hdr_path.get(hdr, ([], 0))
-        return entry[0]
-
-    def _branch(hdr: Any) -> int:
-        entry: tuple[list[Any], int] = hdr_path.get(hdr, ([], 0))
-        return entry[1]
-
-    # Determine the maximum path length and, for each position, whether ANY
-    # spec has a real groupby variable there (kind='group').
-    max_len = 0
-    is_group_position: dict[int, bool] = {}
-    for hdr, _ in row_keys:
-        po = _po(hdr)
-        max_len = max(max_len, len(po))
-        for i, entry in enumerate(po):
-            if entry[0] == "group":
-                is_group_position[i] = True
-            else:
-                is_group_position.setdefault(i, False)
-
-    # For STAT/VAR (non-group) positions, assign an ordinal to each distinct
-    # label in first-seen order, so e.g. 'N' < 'ROWPCTN' is preserved.
-    #
-    # IMPORTANT: this must be scoped PER BRANCH, not globally across the
-    # whole dimension. Each top-level concatenated piece of the TABLE
-    # expression (e.g. "sum*w n*format=... colpctn*format=... (SUM
-    # COLPCTSUM n nmiss ...)*format=...*income") is its own branch, and the
-    # branch index already determines their relative order (branch is the
-    # primary sort key, compared before any of this). If label_order were
-    # shared globally, a stat name seen early in one branch (e.g. a
-    # standalone "n*format=6,0") would claim a low ordinal that then leaks
-    # into an unrelated later branch containing the SAME stat name again
-    # (e.g. "n" inside "(SUM COLPCTSUM n nmiss ...)"), silently reordering
-    # that branch's internal stats to match the EARLIER branch's first
-    # appearance instead of THIS branch's own written order.
-    label_order: dict[int, dict[int, dict[Any, int]]] = {}
-    for hdr, _ in row_keys:
-        po = _po(hdr)
-        branch = _branch(hdr)
-        branch_orders = label_order.setdefault(branch, {})
-        for i, entry in enumerate(po):
-            if not is_group_position.get(i, False):
-                d = branch_orders.setdefault(i, {})
-                if entry[1] not in d:
-                    d[entry[1]] = len(d)
-
-    # For each group-position, compute which distinct original column names
-    # appear there across all specs, in first-seen order. Specs sharing the
-    # same orig_col at a given position should have their values sorted
-    # together (e.g. all origin values); specs with different orig_cols at
-    # that position should be fully separated (e.g. gender block then
-    # age_group block, even when they share value strings like '1' and '2').
-    pos_col_ordinal: dict[int, dict[Any, int]] = {}
-    for hdr, _ in row_keys:
-        po = _po(hdr)
-        for i, entry in enumerate(po):
-            if is_group_position.get(i, False) and entry[0] == "group":
-                orig_col = entry[2] if len(entry) > 2 else entry[1]
-                d = pos_col_ordinal.setdefault(i, {})
-                if orig_col not in d:
-                    d[orig_col] = len(d)
-
-    def sort_key(rk: tuple[Any, Any]) -> tuple[Any, ...]:
-        hdr, dk = rk
-        po = _po(hdr)
-        branch = _branch(hdr)
-
-        if dk == (_SENTINEL,):
-            dk = ()
-
-        dk_iter = iter(dk if isinstance(dk, tuple) else (dk,))
-        parts: list[tuple[Any, ...]] = []
-        for i in range(max_len):
-            if i >= len(po):
-                parts.append((0, 0, ""))
-                continue
-            entry = po[i]
-            if is_group_position.get(i, False):
-                if entry[0] == "group":
-                    val = next(dk_iter, "")
-                    orig_col = entry[2] if len(entry) > 2 else None
-                    # col_ord separates specs whose position-i variables differ
-                    # (e.g. gender vs age_group both at position 1).
-                    # Specs sharing the same orig_col at this position compare
-                    # by value alone (col_ord ties → compare val).
-                    col_ord = pos_col_ordinal.get(i, {}).get(orig_col, 0)
-                    parts.append((1, col_ord, _value_key(orig_col, val)))
-                else:
-                    # ALL/TOTAL at a group position: sort first within its col_ord=0
-                    parts.append((0, 0, ""))
-            else:
-                ordinal = label_order.get(branch, {}).get(i, {}).get(entry[1], 0)
-                parts.append((ordinal,))
-        return (branch, *parts)
-
-    return sorted(row_keys, key=sort_key)
-
-
-# Canonical sentinel for all missing-value types in group keys.
-# Using a distinct string ensures consistent hashing regardless of whether
-# pandas returns float nan, pd.NA, pd.NaT, or None for missing group levels.
-_NAN_SENTINEL = "__nan__"
+    return sorted(row_keys, key=key_fn)
 
 
 def _normalise_key(val: Any) -> Any:
@@ -1251,14 +1484,14 @@ def _fill_cells(
 
 
 if __name__ == "__main__":
-    np.random.seed(42)
+    generator = np.random.default_rng(42)
     n = 200
     demo = pd.DataFrame(
         {
-            "origin": np.random.choice(["Asia", "Europe", "USA"], n),
-            "type": np.random.choice(["Sedan", "SUV", "Truck"], n),
-            "msrp": np.random.normal(35000, 12000, n).clip(10000),
-            "horsepower": np.random.normal(220, 60, n).clip(80),
+            "origin": generator.choice(["Asia", "Europe", "USA"], n),
+            "type": generator.choice(["Sedan", "SUV", "Truck"], n),
+            "msrp": generator.normal(35000, 12000, n).clip(10000),
+            "horsepower": generator.normal(220, 60, n).clip(80),
         }
     )
 

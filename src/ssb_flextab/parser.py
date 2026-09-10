@@ -14,7 +14,7 @@ Token = tuple[str, str, str | None]
 def _tokenize(expr: str) -> list[Token]:
     """Tokenize a single TABLE dimension expression into a flat list of tokens."""
     pattern = re.compile(
-        r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)"
+        r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>\d+[.,]\d+[_s]*)"
         r"|(?P<denom><[^>]*>)"
         r"|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*"
         r'(?:"(?P<dq_label>[^"]*)"|\'(?P<sq_label>[^\']*)\')'
@@ -322,7 +322,7 @@ def _split_dimensions(expr: str) -> list[str]:
         elif ch == "," and depth == 0:
             # Check if this comma is the decimal separator in "format=<digits>,"
             so_far = "".join(current)
-            if re.search(r"format\s*=\s*[0-9]+$", so_far):
+            if re.search(r"format\s*=\s*\d+$", so_far):
                 current.append(ch)  # decimal comma in format=W,D — not a separator
             else:
                 parts.append("".join(current))

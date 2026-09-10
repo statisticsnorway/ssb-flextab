@@ -315,18 +315,6 @@ flextab(
     table="""
     total region
     ,
-    (pctn income*pctsum) * (total sex)
-    """,
-)
-
-# %%
-flextab(
-    data=df,
-    groupby=["region", "sex"],
-    measure="income",
-    table="""
-    total region
-    ,
     (rowpctn income * rowpctsum) * (total sex)
     """,
 )

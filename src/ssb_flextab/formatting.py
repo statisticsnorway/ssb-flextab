@@ -61,7 +61,7 @@ def _parse_fmt_spec(spec: str) -> Callable[[Any], str]:
     ``"9.0s"``
         No decimal places and space-separated thousands.
     """
-    m = re.fullmatch(r"[0-9]+([.,])([0-9]+)([_s]*)", spec.strip())
+    m = re.fullmatch(r"\d+([.,])(\d+)([_s]*)", spec.strip())
     if not m:
         raise ValueError(
             f"Invalid format spec {spec!r}. Expected W.D[_|s] or W,D[_|s]."

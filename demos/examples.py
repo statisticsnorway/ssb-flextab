@@ -532,3 +532,14 @@ flextab(
 )
 
 # %%
+generator = np.random.default_rng(42)
+n = 200
+demo = pd.DataFrame(
+    {
+        "origin": generator.choice(["Asia", "Europe", "USA"], n),
+        "type": generator.choice(["Sedan", "SUV", "Truck"], n),
+        "msrp": generator.normal(35000, 12000, n).clip(10000),
+        "horsepower": generator.normal(220, 60, n).clip(80),
+    }
+)
+demo

@@ -660,8 +660,9 @@ for s, r in zip(sex_list, range(0, len(sex_list)), strict=True):
             rows = df[df["sex"].isna()]
         else:
             rows = df[df["sex"] == s]
+        labs = labels["sex"].get(s, "Unknown sex")   
         print(
-            f"\nTable 1.{r}: Education and region. {labels["sex"].get(s, "Unknown sex")}."
+            f"\nTable 1.{r}: Education and region. {labs}."
         )
     print(
         flextab(

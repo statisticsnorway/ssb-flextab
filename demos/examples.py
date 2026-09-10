@@ -1,6 +1,6 @@
 # %% [markdown]
 # # Flextab Examples
-# These examples are the as used in the overview of table types
+# These examples are the ones used in the overview of table types
 
 # %%
 import numpy as np
@@ -15,8 +15,26 @@ df = pd.DataFrame(
         "sex": ["1", "1", "2", "2", "1", "1", "2", "2"],
         "education": ["1", "2", "1", "2", "1", "2", "1", "2"],
         "count": [40, 60, 30, 70, 50, 90, 45, 115],
-        "income": [4500000, 6500000, 3500000, 126000000, 75000000, 14900000, 12300000, 7000000],
-        "tax": [1500000, 3000000, 1200000, 45900000, 30000000, 6900000, 4440000, 2250000]
+        "income": [
+            4500000,
+            6500000,
+            3500000,
+            126000000,
+            75000000,
+            14900000,
+            12300000,
+            7000000,
+        ],
+        "tax": [
+            1500000,
+            3000000,
+            1200000,
+            45900000,
+            30000000,
+            6900000,
+            4440000,
+            2250000,
+        ],
     }
 )
 
@@ -28,11 +46,7 @@ df["income_total"] = df["income"]
 df["tax_total"] = df["tax"]
 
 # One row for each person
-df = (
-    df.loc[df.index.repeat(df["count"])]
-      .reset_index(drop=True)
-      .drop(columns="count")
-)
+df = df.loc[df.index.repeat(df["count"])].reset_index(drop=True).drop(columns="count")
 
 
 # Distribute income for person in each category
@@ -57,12 +71,8 @@ def distribute_income(x: pd.Series) -> np.ndarray:
     return np.asarray(shares * x.iloc[0], dtype=float)
 
 
-
-df["income"] = (
-    df.groupby(
-        ["region", "sex", "education"]
-    )["income_total"]
-    .transform(distribute_income)
+df["income"] = df.groupby(["region", "sex", "education"])["income_total"].transform(
+    distribute_income
 )
 
 
@@ -72,12 +82,7 @@ df["income"] = (
 income_min = df["income"].min()
 income_max = df["income"].max()
 
-df["taxrate"] = (
-    0.20
-    + 0.30
-    * (df["income"] - income_min)
-    / (income_max - income_min)
-)
+df["taxrate"] = 0.20 + 0.30 * (df["income"] - income_min) / (income_max - income_min)
 
 df["tax"] = df["income"] * df["taxrate"]
 
@@ -106,7 +111,7 @@ labels = {
 
 
 # %%
-print('All nested\n')
+print("All nested\n")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -115,11 +120,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('All nested, with subtotals\n')
+print("All nested, with subtotals\n")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -128,11 +133,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('All stacked\n')
+print("All stacked\n")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -141,11 +146,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('All stacked, with totals\n')
+print("All stacked, with totals\n")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -154,11 +159,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('All stacked, with totals with distribution of lower level\n')
+print("All stacked, with totals with distribution of lower level\n")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -167,11 +172,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Two stacked distributions within each nested')
+print("Two stacked distributions within each nested")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -180,11 +185,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Two stacked distributions within each nested, with subtotals')
+print("Two stacked distributions within each nested, with subtotals")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -193,24 +198,24 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One nested distribution within every stacked')
+print("One nested distribution within every stacked")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
     table="""
-    (region sex) * education 
+    (region sex) * education
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One nested distribution within every stacked, with totals')
+print("One nested distribution within every stacked, with totals")
 flextab(
     data=df,
     groupby=["education", "sex", "region"],
@@ -219,11 +224,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One nested distribution')
+print("One nested distribution")
 flextab(
     data=df,
     groupby=["sex", "region"],
@@ -232,11 +237,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One nested distribution, with subtotals')
+print("One nested distribution, with subtotals")
 flextab(
     data=df,
     groupby=["sex", "region"],
@@ -245,11 +250,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One nested distribution, with totals')
+print("One nested distribution, with totals")
 flextab(
     data=df,
     groupby=["sex", "region"],
@@ -258,11 +263,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One nested distribution, with totals distributed')
+print("One nested distribution, with totals distributed")
 flextab(
     data=df,
     groupby=["sex", "region"],
@@ -271,11 +276,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One nested distribution, with subtotals distributed')
+print("One nested distribution, with subtotals distributed")
 flextab(
     data=df,
     groupby=["sex", "region"],
@@ -284,7 +289,7 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
@@ -296,7 +301,7 @@ flextab(
     ,
     region
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
@@ -308,7 +313,7 @@ flextab(
     ,
     sex
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
@@ -320,11 +325,11 @@ flextab(
     ,
     education
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Column totals')
+print("Column totals")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -333,11 +338,11 @@ flextab(
     ,
     total education
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Row totals')
+print("Row totals")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -346,11 +351,11 @@ flextab(
     ,
     education
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Both row and column totals')
+print("Both row and column totals")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -359,11 +364,11 @@ flextab(
     ,
     total education
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('One distribution')
+print("One distribution")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -372,11 +377,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Stacking')
+print("Stacking")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -385,11 +390,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Nesting')
+print("Nesting")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -398,11 +403,11 @@ flextab(
     ,
     n='count'
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Percent of total')
+print("Percent of total")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -411,11 +416,11 @@ flextab(
     ,
     (total education) * pctn
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Percent of column')
+print("Percent of column")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -424,11 +429,11 @@ flextab(
     ,
     (total education) * colpctn
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Percent of row')
+print("Percent of row")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -437,11 +442,11 @@ flextab(
     ,
     (total education) * rowpctn
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Column percent of measure variable')
+print("Column percent of measure variable")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -449,30 +454,30 @@ flextab(
     table="""
     total region
     ,
-    income * (colpctn colpctsum) * (total education) 
+    income * (colpctn colpctsum) * (total education)
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Percent with custom denominator')
+print("Percent with custom denominator")
 flextab(
     data=df,
     groupby=["education", "region"],
     table="""
     (total region) *
-    (total education) 
+    (total education)
     ,
     pctn<education>
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %% [markdown]
 # ## With measure columns
 
 # %%
-print('Mean, median and sum income')
+print("Mean, median and sum income")
 flextab(
     data=df,
     measure="income",
@@ -481,11 +486,11 @@ flextab(
     ,
     mean median sum
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Mean, median and sum income by group column in the rows')
+print("Mean, median and sum income by group column in the rows")
 flextab(
     data=df,
     groupby="education",
@@ -495,11 +500,11 @@ flextab(
     ,
     income * (mean median sum)
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Mean, median and sum income by group column in the rows and in the columns')
+print("Mean, median and sum income by group column in the rows and in the columns")
 flextab(
     data=df,
     groupby=["education", "region"],
@@ -509,11 +514,11 @@ flextab(
     ,
     region * income * (mean median sum)
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%
-print('Percentage of another measure column')
+print("Percentage of another measure column")
 flextab(
     data=df,
     groupby="region",
@@ -523,7 +528,7 @@ flextab(
     ,
     (income tax) * sum tax * pctsum<income>
     """,
-    labels=labels
+    labels=labels,
 )
 
 # %%

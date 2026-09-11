@@ -1,6 +1,6 @@
 [project]
 name = "ssb-flextab"
-version = "0.1.0"
+version = "0.9.0"
 description = "SSB flextab"
 authors = [{ name = "Kristian Lønø", email = "krl@ssb.no" }]
 maintainers = [{ name = "Statistics Norway, IT-Architecture Department (702)" }]
@@ -13,6 +13,7 @@ dependencies = [
     "pandas>=2.2.3,<4.0.0",
     "openpyxl>=3.1.0,<4.0.0",
     "pandas-stubs (>=3.0.5.260730,<4.0.0.0)",
+    "ruff (>=0.16.5,<0.17.0)",
 ]
 
 [project.urls]

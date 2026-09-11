@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from dataclasses import field
+from itertools import product as iproduct
 from typing import Any
 
 from .statistics import ALL_STATS
@@ -10,52 +11,63 @@ from .statistics import ALL_STATS
 # carries None in that position, so all tokens share one uniform shape.
 Token = tuple[str, str, str | None]
 
+_TOKEN_PATTERN = re.compile(
+    r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>[0-9]+[.,][0-9]+[_s]*)"
+    r"|(?P<denom><[^>]*>)"
+    r"|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*"
+    r'(?:"(?P<dq_label>[^"]*)"|\'(?P<sq_label>[^\']*)\')'
+    r"|(?P<n>[A-Za-z_][A-Za-z0-9_%]*)"
+    r"|(?P<op>[*()])"
+    r"|(?P<space>\s+)"
+)
 
-def _tokenize(expr: str) -> list[Token]:
-    """Tokenize a single TABLE dimension expression into a flat list of tokens."""
-    pattern = re.compile(
-        r"(?P<fmt>format)\s*=\s*(?P<fmt_spec>\d+[.,]\d+[_s]*)"
-        r"|(?P<denom><[^>]*>)"
-        r"|(?P<labeled>[A-Za-z_][A-Za-z0-9_%]*)\s*=\s*"
-        r'(?:"(?P<dq_label>[^"]*)"|\'(?P<sq_label>[^\']*)\')'
-        r"|(?P<name>[A-Za-z_][A-Za-z0-9_%]*)"
-        r"|(?P<op>[*()])"
-        r"|(?P<space>\s+)"
-    )
 
+def _match_to_token(m: re.Match[str]) -> Token | None:
+    """Convert a single regex match into a Token, or None for a discarded match."""
+    if m.group("fmt"):
+        return ("FMT", m.group("fmt_spec"), None)
+    if m.group("denom"):
+        inner = m.group("denom")[1:-1].strip()
+        return ("DENOM", inner, None)
+    if m.group("labeled"):
+        label = (
+            m.group("dq_label")
+            if m.group("dq_label") is not None
+            else m.group("sq_label")
+        )
+        return ("NAME", m.group("labeled"), label)
+    if m.group("n"):
+        return ("NAME", m.group("n"), None)
+    if m.group("op"):
+        return ("OP", m.group("op"), None)
+    if m.group("space"):
+        return ("SP", " ", None)
+    return None
+
+
+def _scan_tokens(expr: str) -> list[Token]:
+    """Scan `expr` with the token pattern, raising on any unmatched gap."""
     tokens: list[Token] = []
     pos = 0
 
-    for m in pattern.finditer(expr):
+    for m in _TOKEN_PATTERN.finditer(expr):
         if m.start() != pos:
             invalid = expr[pos : m.start()]
             raise SyntaxError(f"Unexpected character(s) {invalid!r} at position {pos}")
-
         pos = m.end()
-
-        if m.group("fmt"):
-            tokens.append(("FMT", m.group("fmt_spec"), None))
-        elif m.group("denom"):
-            inner = m.group("denom")[1:-1].strip()
-            tokens.append(("DENOM", inner, None))
-        elif m.group("labeled"):
-            label = (
-                m.group("dq_label")
-                if m.group("dq_label") is not None
-                else m.group("sq_label")
-            )
-            tokens.append(("NAME", m.group("labeled"), label))
-        elif m.group("name"):
-            tokens.append(("NAME", m.group("name"), None))
-        elif m.group("op"):
-            tokens.append(("OP", m.group("op"), None))
-        elif m.group("space"):
-            tokens.append(("SP", " ", None))
+        token = _match_to_token(m)
+        if token is not None:
+            tokens.append(token)
 
     if pos != len(expr):
         invalid = expr[pos:]
         raise SyntaxError(f"Unexpected character(s) {invalid!r} at position {pos}")
 
+    return tokens
+
+
+def _clean_tokens(tokens: list[Token]) -> list[Token]:
+    """Collapse consecutive SP tokens and strip leading/trailing SP."""
     cleaned: list[Token] = []
     for token in tokens:
         if token[0] == "SP" and cleaned and cleaned[-1][0] == "SP":
@@ -69,6 +81,11 @@ def _tokenize(expr: str) -> list[Token]:
         cleaned.pop()
 
     return cleaned
+
+
+def _tokenize(expr: str) -> list[Token]:
+    """Tokenize a single TABLE dimension expression into a flat list of tokens."""
+    return _clean_tokens(_scan_tokens(expr))
 
 
 @dataclass
@@ -172,45 +189,60 @@ class _Parser:
 
         return node
 
+    def _should_continue_concat(self) -> bool:
+        """Advance past whitespace; return whether another concat member follows."""
+        saved = self.pos
+        while self.pos < len(self.tokens) and self.tokens[self.pos][0] == "SP":
+            self.pos += 1
+        if self.pos >= len(self.tokens):
+            return False
+        nxt = self.tokens[self.pos]
+        if nxt[0] == "OP" and nxt[1] in (")", "*"):
+            self.pos = saved
+            return False
+        return True
+
     def _parse_concat(self) -> DimNode:
         nodes = [self._parse_cross()]
-        while True:
-            saved = self.pos
-            while self.pos < len(self.tokens) and self.tokens[self.pos][0] == "SP":
-                self.pos += 1
-            if self.pos >= len(self.tokens):
-                break
-            nxt = self.tokens[self.pos]
-            if nxt[0] == "OP" and nxt[1] in (")", "*"):
-                self.pos = saved
-                break
+        while self._should_continue_concat():
             nodes.append(self._parse_cross())
         return nodes[0] if len(nodes) == 1 else DimNode(kind="concat", children=nodes)
 
+    def _try_consume_trailing_fmt(self, node: DimNode) -> bool:
+        """If '*format=...' follows immediately, consume and apply it.
+
+        Returns True if a trailing format was consumed, False if the
+        position was restored because no FMT token follows the '*'.
+        """
+        saved = self.pos
+        self._skip_sp()
+        self.pos += 1  # consume '*'
+        self._skip_sp()
+        if self.pos < len(self.tokens) and self.tokens[self.pos][0] == "FMT":
+            fmt_spec = self.tokens[self.pos][1]
+            self.pos += 1
+            self._apply_fmt(node, fmt_spec)
+            return True
+        self.pos = saved
+        return False
+
+    def _consume_cross_star(self, nodes: list[DimNode]) -> bool:
+        """Try to consume one '*'-joined cross step. Returns whether to keep looping."""
+        p = self.peek()
+        if not (p and p[0] == "OP" and p[1] == "*"):
+            return False
+        if self._try_consume_trailing_fmt(nodes[-1]):
+            return True
+        # Not a format suffix — restore and parse as a normal cross atom
+        self._skip_sp()
+        self.pos += 1
+        nodes.append(self._parse_atom())
+        return True
+
     def _parse_cross(self) -> DimNode:
         nodes = [self._parse_atom()]
-        while True:
-            p = self.peek()
-            if p and p[0] == "OP" and p[1] == "*":
-                # Look ahead past the '*' (and any space) to see if a FMT
-                # token follows. If so, this '*format=...' applies to the
-                # PRECEDING node (e.g. mean*format=7.1), not a new atom.
-                saved = self.pos
-                self._skip_sp()
-                self.pos += 1  # consume '*'
-                self._skip_sp()
-                if self.pos < len(self.tokens) and self.tokens[self.pos][0] == "FMT":
-                    fmt_spec = self.tokens[self.pos][1]
-                    self.pos += 1
-                    self._apply_fmt(nodes[-1], fmt_spec)
-                    continue
-                # Not a format suffix — restore and parse as a normal cross atom
-                self.pos = saved
-                self._skip_sp()
-                self.pos += 1
-                nodes.append(self._parse_atom())
-            else:
-                break
+        while self._consume_cross_star(nodes):
+            pass
         return nodes[0] if len(nodes) == 1 else DimNode(kind="cross", children=nodes)
 
     def _apply_fmt(self, node: DimNode, fmt_spec: str) -> None:
@@ -290,6 +322,59 @@ class _Parser:
         return None
 
 
+def _is_format_decimal_comma(chars_so_far: str) -> bool:
+    """Whether a comma at this position is the decimal separator in format=W,D."""
+    return bool(re.search(r"format\s*=\s*[0-9]+$", chars_so_far))
+
+
+@dataclass
+class _DimSplitScanner:
+    """Stateful character-by-character scanner used by ``_split_dimensions``.
+
+    Tracks whether we're inside a quoted string or parentheses so that a
+    comma there is not mistaken for a dimension separator.
+    """
+
+    parts: list[str] = field(default_factory=list)
+    current: list[str] = field(default_factory=list)
+    depth: int = 0
+    in_str: bool = False
+    str_char: str | None = None
+
+    def flush(self) -> None:
+        self.parts.append("".join(self.current))
+        self.current = []
+
+    def _consume_comma(self, ch: str) -> None:
+        so_far = "".join(self.current)
+        if _is_format_decimal_comma(so_far):
+            self.current.append(ch)  # decimal comma in format=W,D — not a separator
+        else:
+            self.flush()
+
+    def consume(self, ch: str) -> None:
+        if not self.in_str and ch in ("'", '"'):
+            self.in_str = True
+            self.str_char = ch
+            self.current.append(ch)
+        elif self.in_str and ch == self.str_char:
+            self.in_str = False
+            self.str_char = None
+            self.current.append(ch)
+        elif self.in_str:
+            self.current.append(ch)
+        elif ch == "(":
+            self.depth += 1
+            self.current.append(ch)
+        elif ch == ")":
+            self.depth -= 1
+            self.current.append(ch)
+        elif ch == "," and self.depth == 0:
+            self._consume_comma(ch)
+        else:
+            self.current.append(ch)
+
+
 def _split_dimensions(expr: str) -> list[str]:
     """Split on top-level commas (not inside parentheses or quoted strings).
 
@@ -297,42 +382,12 @@ def _split_dimensions(expr: str) -> list[str]:
     (immediately following the width digits of "format=", e.g.
     "format=7,2" or "format=7,2_") is NOT treated as a dimension separator.
     """
-    parts, current, depth = [], [], 0
-    in_str = False
-    str_char = None
-    i = 0
-    while i < len(expr):
-        ch = expr[i]
-        if not in_str and ch in ("'", '"'):
-            in_str = True
-            str_char = ch
-            current.append(ch)
-        elif in_str and ch == str_char:
-            in_str = False
-            str_char = None
-            current.append(ch)
-        elif in_str:
-            current.append(ch)
-        elif ch == "(":
-            depth += 1
-            current.append(ch)
-        elif ch == ")":
-            depth -= 1
-            current.append(ch)
-        elif ch == "," and depth == 0:
-            # Check if this comma is the decimal separator in "format=<digits>,"
-            so_far = "".join(current)
-            if re.search(r"format\s*=\s*\d+$", so_far):
-                current.append(ch)  # decimal comma in format=W,D — not a separator
-            else:
-                parts.append("".join(current))
-                current = []
-        else:
-            current.append(ch)
-        i += 1
-    if current:
-        parts.append("".join(current))
-    return parts
+    scanner = _DimSplitScanner()
+    for ch in expr:
+        scanner.consume(ch)
+    if scanner.current:
+        scanner.flush()
+    return scanner.parts
 
 
 def parse_table(table_str: str) -> tuple[DimNode, ...]:
@@ -349,24 +404,29 @@ def parse_table(table_str: str) -> tuple[DimNode, ...]:
     return tuple(result)
 
 
-def _expand_node(node: DimNode) -> list[list[DimNode]]:
-    from itertools import product as iproduct
+def _expand_concat(node: DimNode) -> list[list[DimNode]]:
+    result = []
+    for child in node.children:
+        result.extend(_expand_node(child))
+    return result
 
+
+def _expand_cross(node: DimNode) -> list[list[DimNode]]:
+    child_paths = [_expand_node(c) for c in node.children]
+    return [
+        [leaf for path in combo for leaf in path] for combo in iproduct(*child_paths)
+    ]
+
+
+def _expand_node(node: DimNode) -> list[list[DimNode]]:
     if node.kind in ("var", "all"):
         return [[node]]
     if node.kind == "group":
         return _expand_node(node.children[0])
     if node.kind == "concat":
-        result = []
-        for child in node.children:
-            result.extend(_expand_node(child))
-        return result
+        return _expand_concat(node)
     if node.kind == "cross":
-        child_paths = [_expand_node(c) for c in node.children]
-        return [
-            [leaf for path in combo for leaf in path]
-            for combo in iproduct(*child_paths)
-        ]
+        return _expand_cross(node)
     raise ValueError(f"Unknown node kind: {node.kind}")
 
 
@@ -399,13 +459,56 @@ def _expand_node_with_branch(node: DimNode) -> list[tuple[int, list[DimNode]]]:
     return [(0, path) for path in _expand_node(node)]
 
 
-def _classify_path(
-    path: list[DimNode], measure_list: list[str], groupby_list: list[str]
-) -> dict[str, Any]:
+def _classify_node(
+    node: DimNode,
+    groupby_map: dict[str, str],
+    measure_map: dict[str, str],
+) -> tuple[str, str | None]:
+    """Classify one path node, returning (category, orig_name_or_None).
+
+    category is one of: 'all', 'group', 'var', 'stat'.
+    """
+    upper = node.name.upper() if node.name else ""
+    if node.kind == "all":
+        return "all", None
+    if upper in groupby_map:
+        return "group", groupby_map[upper]
+    if upper in measure_map:
+        return "var", measure_map[upper]
+    if upper in ALL_STATS:
+        return "stat", upper
+    raise ValueError(
+        f"Token {node.name!r} not found in measure=, groupby=, or known statistics.\n"
+        f"Tip: if your label uses the same quote character as the surrounding "
+        f"Python string, Python will terminate the string early.\n"
+        f"Known statistics: {sorted(ALL_STATS)}"
+    )
+
+
+def _classify_path_nodes(
+    path: list[DimNode],
+    measure_list: list[str],
+    groupby_list: list[str],
+) -> tuple[
+    list[tuple[str, str]],
+    str | None,
+    str | None,
+    str | None,
+    str | None,
+    bool,
+    str | None,
+    list[tuple[str, str, str | None]],
+]:
+    """Classify each node in `path` in a single pass.
+
+    Builds both the summary fields (group_keys/var/stat/has_all/...) and
+    path_order.
+    """
     measure_map = {m.upper(): m for m in measure_list}
     groupby_map = {g.upper(): g for g in groupby_list}
 
-    group_keys = []
+    group_keys: list[tuple[str, str]] = []
+    path_order: list[tuple[str, str, str | None]] = []
     var = None
     var_label = None
     stat = None
@@ -414,62 +517,66 @@ def _classify_path(
     all_label = None
 
     for node in path:
-        upper = node.name.upper() if node.name else ""
-        if node.kind == "all":
+        category, orig = _classify_node(node, groupby_map, measure_map)
+        if category == "all":
             has_all = True
             all_label = node.label
-        elif upper in groupby_map:
-            orig = groupby_map[upper]
-            lbl = node.label if node.label is not None else orig
-            group_keys.append((orig, lbl))
-        elif upper in measure_map:
-            orig = measure_map[upper]
-            var = orig
-            var_label = node.label if node.label is not None else orig
-        elif upper in ALL_STATS:
-            stat = upper
-            stat_label = node.label if node.label is not None else upper
-        else:
-            raise ValueError(
-                f"Token {node.name!r} not found in measure=, groupby=, or known statistics.\n"
-                f"Tip: if your label uses the same quote character as the surrounding "
-                f"Python string, Python will terminate the string early.\n"
-                f"Known statistics: {sorted(ALL_STATS)}"
-            )
-
-    path_order: list[tuple[str, str, str | None]] = []
-    for node in path:
-        upper = node.name.upper() if node.name else ""
-        if node.kind == "all":
             path_order.append(
                 ("all", node.label if node.label is not None else "TOTAL", None)
             )
-        elif upper in groupby_map:
-            orig_name = groupby_map[upper]
-            lbl = node.label if node.label is not None else orig_name
-            # Store original column name as third element so _key_to_label
-            # can detect whether the label was explicitly renamed by the user.
-            path_order.append(("group", lbl, orig_name))
-        elif upper in measure_map:
-            lbl = node.label if node.label is not None else measure_map[upper]
-            path_order.append(("var", lbl, None))
-        elif upper in ALL_STATS:
-            lbl = node.label if node.label is not None else upper
-            path_order.append(("stat", lbl, None))
+        elif category == "group":
+            assert orig is not None  # guaranteed by _classify_node for "group"
+            lbl = node.label if node.label is not None else orig
+            group_keys.append((orig, lbl))
+            path_order.append(("group", lbl, orig))
+        elif category == "var":
+            assert orig is not None  # guaranteed by _classify_node for "var"
+            var = orig
+            var_label = node.label if node.label is not None else orig
+            path_order.append(("var", var_label, None))
+        else:  # 'stat'
+            assert orig is not None  # guaranteed by _classify_node for "stat"
+            stat = orig
+            stat_label = node.label if node.label is not None else orig
+            path_order.append(("stat", stat_label, None))
 
-    # Collect any format specs from the path nodes.
-    # The innermost (last) non-None fmt wins so e.g. stat*format=7.1
-    # overrides a measure-level format.
+    return group_keys, var, var_label, stat, stat_label, has_all, all_label, path_order
+
+
+def _collect_fmt(path: list[DimNode]) -> str | None:
+    """Return the innermost (last) non-None fmt.
+
+    E.g. stat*format=7.1 overrides a measure-level format.
+    """
     fmt = None
     for node in path:
         if node.fmt is not None:
             fmt = node.fmt
+    return fmt
 
-    # Collect denom_def from any node that carries one (stat node with <...>)
+
+def _collect_denom(path: list[DimNode]) -> str | None:
+    """Collect denom_def from any node that carries one (stat node with <...>)."""
     denom_def = None
     for node in path:
         if node.denom is not None:
             denom_def = node.denom
+    return denom_def
+
+
+def _classify_path(
+    path: list[DimNode], measure_list: list[str], groupby_list: list[str]
+) -> dict[str, Any]:
+    (
+        group_keys,
+        var,
+        var_label,
+        stat,
+        stat_label,
+        has_all,
+        all_label,
+        path_order,
+    ) = _classify_path_nodes(path, measure_list, groupby_list)
 
     return {
         "group_keys": group_keys,
@@ -480,6 +587,6 @@ def _classify_path(
         "has_all": has_all,
         "all_label": all_label,
         "path_order": path_order,
-        "fmt": fmt,
-        "denom_def": denom_def,
+        "fmt": _collect_fmt(path),
+        "denom_def": _collect_denom(path),
     }

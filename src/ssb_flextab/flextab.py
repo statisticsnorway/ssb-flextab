@@ -240,7 +240,7 @@ def _default_table_expr(measure: list[str], groupby: list[str]) -> str:
 
 
 def _split_dims(
-    dims: list[DimNode],
+    dims: tuple[DimNode, ...],
 ) -> tuple[DimNode | None, DimNode]:
     """Split the parsed TABLE expression into (row_dim, col_dim)."""
     if len(dims) == 1:
@@ -537,6 +537,7 @@ def _sort_keys(
     label_map: dict[str, dict[Any, str]],
 ) -> list[tuple[Any, Any]]:
     """Sort row/col keys, respecting sort_by='code', 'index', or 'label'."""
+    value_key_fn: Callable[[str | None, Any], tuple[int, int | str]] | None
     if sort_by == "index" and label_map:
         value_key_fn = partial(_index_value_key, label_map=label_map)
     elif sort_by == "label" and label_map:
@@ -609,14 +610,14 @@ def _slot_range(
     local_pos: int,
     num_positions: int,
     slots: list[int],
-    D: int,
+    total_depth: int,
 ) -> tuple[int, int]:
     # local_pos is the index within path_order (0 = outermost of THIS spec)
     # map to the global slots list (bottom-aligned)
     global_pos = len(slots) - num_positions + local_pos
     low = sum(slots[global_pos + 1 :])
     high = low + slots[global_pos] - 1
-    return D - 1 - high, D - 1 - low  # (hi_idx, lo_idx)
+    return total_depth - 1 - high, total_depth - 1 - low  # (hi_idx, lo_idx)
 
 
 def _place_group_entry(
@@ -657,8 +658,9 @@ def _key_to_label_slotted(
 ) -> Any:
     """Build a fixed-length index tuple using a pre-computed slot layout.
 
-    D = sum(slots) levels total. Slots assigned bottom-up: the innermost
-    (rightmost) path_order position occupies the lowest (rightmost) slots.
+    total_depth = sum(slots) levels total. Slots assigned bottom-up: the
+    innermost (rightmost) path_order position occupies the lowest
+    (rightmost) slots.
 
     For a spec whose path_order is SHORTER than the full slot list (i.e.
     it has fewer cross-positions than the deepest spec), its tokens are
@@ -674,7 +676,7 @@ def _key_to_label_slotted(
     if not path_order:
         return hdr
 
-    D = sum(slots)
+    total_depth = sum(slots)
     is_total = (not data_key) or data_key == (_SENTINEL,)
     dvals = (
         []
@@ -683,14 +685,14 @@ def _key_to_label_slotted(
     )
     data_iter = iter(dvals)
 
-    row = [""] * D
+    row = [""] * total_depth
     num_positions = len(path_order)
 
     for pos, entry in enumerate(path_order):
         kind = entry[0]
         label = entry[1]
         orig_name = entry[2] if len(entry) > 2 else None
-        hi_idx, lo_idx = _slot_range(pos, num_positions, slots, D)
+        hi_idx, lo_idx = _slot_range(pos, num_positions, slots, total_depth)
 
         if kind != "group":
             row[lo_idx] = label
@@ -729,8 +731,8 @@ def _make_index(
     """Convert header/data-key pairs to an index using slot-based layout.
 
     Every specification in the dimension produces a fixed-length tuple of the
-    same depth, ``D = sum(slots)``, where the slot layout is computed globally
-    so that all specifications align correctly:
+    same depth, ``total_depth = sum(slots)``, where the slot layout is
+    computed globally so that all specifications align correctly:
 
     - Groupby variables occupy two slots: one label row and one value row.
     - Statistic, measure, and ALL/TOTAL tokens occupy one slot each.
@@ -774,7 +776,7 @@ def _make_index(
 
     The slot layout has one slot for the statistic position and two slots for
     the group/ALL position because ``age_group`` has a non-blank label. This
-    gives ``D = 3``.
+    gives ``total_depth = 3``.
 
     After bottom alignment and removal of levels that are blank everywhere,
     the entries align so that totals and group values occupy the same logical
@@ -795,9 +797,9 @@ def _make_index(
     """
     all_po = [hdr_path.get(hdr, ([], 0))[0] for hdr, _ in keys]
     slots = _compute_slot_layout(all_po)
-    D = sum(slots)
+    total_depth = sum(slots)
 
-    if D == 0:
+    if total_depth == 0:
         return pd.Index([""] * len(keys))
 
     labels = [
@@ -813,10 +815,10 @@ def _make_index(
 
     labels = _drop_blank_levels(labels)
 
-    n_levels = len(labels[0]) if labels else 0
-    if n_levels == 0:
+    final_depth = len(labels[0]) if labels else 0
+    if final_depth == 0:
         return pd.Index([""] * len(keys))
-    if n_levels == 1:
+    if final_depth == 1:
         return cast(pd.Index, pd.Index([t[0] for t in labels]))
     return pd.MultiIndex.from_tuples(labels)
 

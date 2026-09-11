@@ -39,6 +39,7 @@ from ssb_flextab.statistics import _compute_series
 from ssb_flextab.statistics import _drop_nan_x
 from ssb_flextab.statistics import _hmean
 from ssb_flextab.statistics import _parse_denom_def
+from ssb_flextab.statistics import _resolve_denominator
 from ssb_flextab.statistics import _wgmean
 from ssb_flextab.statistics import _whmean
 from ssb_flextab.statistics import _wmean
@@ -554,6 +555,187 @@ class TestComputeCustomPct:
             c_path_order=[],
         )
         assert s["__total__"] == approx(100.0)
+
+    def test_group_innermost_falls_back_to_a_different_groupby_token(
+        self, df: pd.DataFrame
+    ) -> None:
+        # Rows broken down by sex*region (innermost = region), but the
+        # denom list names "sex" instead of "region". "sex" doesn't match
+        # the innermost variable, so this exercises the group-innermost
+        # fallback loop's "tok in groupby_upper" branch: the token names
+        # the column to COLLAPSE, so denom_def="sex" removes "sex" from
+        # the grouping and leaves a region-only subtotal as the
+        # denominator (not a sex-only one).
+        r_path_order = [("group", "sex", "sex"), ("group", "region", "region")]
+        s = _compute_custom_pct(
+            df,
+            r_groups=["sex", "region"],
+            c_groups=[],
+            var="income",
+            stat="PCTSUM",
+            denom_def="sex",
+            groupby=["sex", "region"],
+            measure=["income"],
+            missing=False,
+            r_path_order=r_path_order,
+            c_path_order=[],
+        )
+        # region totals: E=80 (10+30+40), W=70 (20+50)
+        assert s[("M", "E")] == approx(10 / 80 * 100)
+        assert s[("M", "W")] == approx(20 / 70 * 100)
+        assert s[("F", "E")] == approx(70 / 80 * 100)
+        assert s[("F", "W")] == approx(50 / 70 * 100)
+
+    def test_all_innermost_falls_back_to_groupby_token_when_no_all_token(
+        self, df: pd.DataFrame
+    ) -> None:
+        # The row is a Total/ALL row (innermost_kind="all"), but the denom
+        # list has no ALL/TOTAL token -- only a groupby name. This
+        # exercises _resolve_denom_for_all_innermost's second loop (no
+        # ALL/TOTAL found, fall back to the named groupby column).
+        r_path_order = [("all", "TOTAL", None)]
+        s = _compute_custom_pct(
+            df,
+            r_groups=[],
+            c_groups=[],
+            var="income",
+            stat="PCTSUM",
+            denom_def="sex",
+            groupby=["sex"],
+            measure=["income"],
+            missing=False,
+            r_path_order=r_path_order,
+            c_path_order=[],
+        )
+        # denom collapses "sex" out of an already-empty grouping -> grand
+        # total, same as the direct ALL/TOTAL-token case.
+        assert s["__total__"] == approx(100.0)
+
+    def test_unknown_innermost_with_no_groupby_or_all_in_path_uses_left_to_right(
+        self, df: pd.DataFrame
+    ) -> None:
+        # path_order has no "group"/"all" entries at all (just a bare
+        # stat token), so innermost_kind/orig come back as (None, None)
+        # and _resolve_denom_for_unknown_innermost's left-to-right scan
+        # is what resolves the token -- here a groupby name ("region"),
+        # which collapses that column out of the grouping.
+        s = _compute_custom_pct(
+            df,
+            r_groups=["sex", "region"],
+            c_groups=[],
+            var="income",
+            stat="PCTSUM",
+            denom_def="region",
+            groupby=["sex", "region"],
+            measure=["income"],
+            missing=False,
+            r_path_order=[("stat", "PCTSUM", None)],
+            c_path_order=[],
+        )
+        # sex totals: M=30 (10+20), F=120 (30+40+50)
+        assert s[("M", "E")] == approx(10 / 30 * 100)
+        assert s[("M", "W")] == approx(20 / 30 * 100)
+        assert s[("F", "E")] == approx(70 / 120 * 100)
+        assert s[("F", "W")] == approx(50 / 120 * 100)
+
+    def test_no_token_matches_anything_defaults_to_grand_total_same_measure(
+        self, df: pd.DataFrame
+    ) -> None:
+        # None of the denom tokens name a measure, a groupby column, or
+        # ALL/TOTAL -- every resolver falls through to the shared default
+        # of (same measure as numerator, grand total).
+        r_path_order = [("group", "sex", "sex")]
+        s = _compute_custom_pct(
+            df,
+            r_groups=["sex"],
+            c_groups=[],
+            var="income",
+            stat="PCTSUM",
+            denom_def="nosuchtoken",
+            groupby=["sex"],
+            measure=["income"],
+            missing=False,
+            r_path_order=r_path_order,
+            c_path_order=[],
+        )
+        total = df["income"].sum()
+        m_total = df.loc[df["sex"] == "M", "income"].sum()
+        f_total = df.loc[df["sex"] == "F", "income"].sum()
+        assert s["M"] == approx(100 * m_total / total)
+        assert s["F"] == approx(100 * f_total / total)
+
+
+class TestResolveDenominatorHelpers:
+    """
+    Direct, isolated checks of the denominator-resolution helpers.
+
+    _compute_custom_pct dispatches to these helpers. TestComputeCustomPct
+    above exercises the same logic end-to-end; these tests pin down each
+    branch individually so a future change to the dispatch in
+    _resolve_denominator fails close to the branch it broke.
+    """
+
+    def test_measure_token_takes_priority_over_group_innermost(self) -> None:
+        # Even when the innermost breakdown is a real groupby column, a
+        # denom token naming a measure always wins.
+        var, groups = _resolve_denominator(
+            denom_tokens=["INCOME"],
+            innermost_kind="group",
+            innermost_orig="region",
+            measure_upper=["INCOME", "TAX"],
+            measure_map={"INCOME": "income", "TAX": "tax"},
+            groupby_upper=["SEX", "REGION"],
+            groupby_map={"SEX": "sex", "REGION": "region"},
+            all_groups=["sex", "region"],
+            var="tax",
+        )
+        assert var == "income"
+        assert groups == ["sex", "region"]
+
+    def test_group_innermost_direct_match_collapses_that_column(self) -> None:
+        var, groups = _resolve_denominator(
+            denom_tokens=["REGION"],
+            innermost_kind="group",
+            innermost_orig="region",
+            measure_upper=["INCOME"],
+            measure_map={"INCOME": "income"},
+            groupby_upper=["SEX", "REGION"],
+            groupby_map={"SEX": "sex", "REGION": "region"},
+            all_groups=["sex", "region"],
+            var="income",
+        )
+        assert var == "income"
+        assert groups == ["sex"]
+
+    def test_unresolvable_tokens_default_to_grand_total_same_var(self) -> None:
+        var, groups = _resolve_denominator(
+            denom_tokens=["NOSUCHTOKEN"],
+            innermost_kind="group",
+            innermost_orig="region",
+            measure_upper=["INCOME"],
+            measure_map={"INCOME": "income"},
+            groupby_upper=["SEX", "REGION"],
+            groupby_map={"SEX": "sex", "REGION": "region"},
+            all_groups=["sex", "region"],
+            var="income",
+        )
+        assert var == "income"
+        assert groups == []
+
+    def test_unknown_innermost_none_none_scans_left_to_right(self) -> None:
+        var, groups = _resolve_denominator(
+            denom_tokens=["REGION", "ALL"],
+            innermost_kind=None,
+            innermost_orig=None,
+            measure_upper=["INCOME"],
+            measure_map={"INCOME": "income"},
+            groupby_upper=["SEX", "REGION"],
+            groupby_map={"SEX": "sex", "REGION": "region"},
+            all_groups=["sex", "region"],
+            var="income",
+        )
+        assert var == "income"
+        assert groups == ["sex"]  # REGION token matches first -> collapse it
 
 
 # --------------------------------------------------------------------------

@@ -354,7 +354,9 @@ def _require_var_for_base_stat(var: str | None, stat: str) -> None:
         )
 
 
-def _require_var_for_percent_stat(var: str | None, stat: str, count_based: bool) -> None:
+def _require_var_for_percent_stat(
+    var: str | None, stat: str, count_based: bool
+) -> None:
     if not count_based and var is None:
         raise ValueError(
             f"Statistic '{stat}' requires a measure variable. "
@@ -473,7 +475,11 @@ def _compute_percent_stat(
 
     series = _agg_group(data, groups, raw_func, raw_wfunc, var, weight, dropna)
     grand = _grand_value(
-        data, raw_func if var is not None else (lambda x: len(x)), raw_wfunc, var, weight
+        data,
+        raw_func if var is not None else (lambda x: len(x)),
+        raw_wfunc,
+        var,
+        weight,
     )
 
     if stat in ("PCTN", "PCTSUM"):
@@ -486,7 +492,16 @@ def _compute_percent_stat(
 
     if stat in ("COLPCTN", "COLPCTSUM"):
         return _col_pct_series(
-            series, grand, r_groups, c_groups, data, raw_func, raw_wfunc, var, weight, dropna
+            series,
+            grand,
+            r_groups,
+            c_groups,
+            data,
+            raw_func,
+            raw_wfunc,
+            var,
+            weight,
+            dropna,
         )
 
     raise ValueError(f"Unknown statistic: {stat}")
@@ -531,12 +546,6 @@ def _compute_series(
     -------
     pd.Series
         Aggregated values indexed by the grouping columns in ``all_groups``.
-
-    Raises
-    ------
-    ValueError
-        If the requested statistic requires a measure variable but ``var``
-        is None.
 
     Notes
     -----
@@ -705,7 +714,16 @@ def _compute_all_percent_stat(
 
     if stat in ("COLPCTN", "COLPCTSUM"):
         return _all_col_pct_series(
-            series, grand, groups_to_keep, c_groups, data, raw_func, raw_wfunc, var, weight, dropna
+            series,
+            grand,
+            groups_to_keep,
+            c_groups,
+            data,
+            raw_func,
+            raw_wfunc,
+            var,
+            weight,
+            dropna,
         )
 
     if stat in ("ROWPCTN", "ROWPCTSUM"):
@@ -770,14 +788,6 @@ def _compute_all_series(
         Aggregated values for the requested statistic and ALL/TOTAL margin,
         indexed by the grouping columns that remain after collapsing the ALL
         dimension.
-
-    Raises
-    ------
-    ValueError
-        If ``var`` is None for a statistic that requires a measure variable.
-        Without a measure, only plain count statistics such as ``N``,
-        ``COUNT``, and ``SIZE``, and supported count-based percentage
-        statistics, can be computed.
 
     Notes
     -----
@@ -1051,7 +1061,13 @@ def _resolve_denominator(
         )
     else:
         result = _resolve_denom_for_unknown_innermost(
-            denom_tokens, measure_upper, measure_map, groupby_upper, groupby_map, all_groups, var
+            denom_tokens,
+            measure_upper,
+            measure_map,
+            groupby_upper,
+            groupby_map,
+            all_groups,
+            var,
         )
 
     if result is None:

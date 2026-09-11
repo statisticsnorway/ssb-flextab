@@ -1191,9 +1191,7 @@ def flextab(
 # ---------------------------------------------------------------------------
 
 
-def _get_path_order(
-    hdr: Any, hdr_path: dict[Any, tuple[list[Any], int]]
-) -> list[Any]:
+def _get_path_order(hdr: Any, hdr_path: dict[Any, tuple[list[Any], int]]) -> list[Any]:
     entry: tuple[list[Any], int] = hdr_path.get(hdr, ([], 0))
     return entry[0]
 
@@ -1342,7 +1340,14 @@ def _row_sort_key(
     dk_iter = iter(dk if isinstance(dk, tuple) else (dk,))
     parts = [
         _row_sort_part(
-            i, po, is_group_position, pos_col_ordinal, label_order, branch, dk_iter, value_key_fn
+            i,
+            po,
+            is_group_position,
+            pos_col_ordinal,
+            label_order,
+            branch,
+            dk_iter,
+            value_key_fn,
         )
         for i in range(max_len)
     ]

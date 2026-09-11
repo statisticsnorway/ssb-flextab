@@ -488,7 +488,11 @@ def _apply_cell_colors(
 
 
 def _style_header_rows(
-    ws: Any, specs: _StyleSpecs, layout: _ExcelLayout, pattern_fill_cls: Any, font_cls: Any
+    ws: Any,
+    specs: _StyleSpecs,
+    layout: _ExcelLayout,
+    pattern_fill_cls: Any,
+    font_cls: Any,
 ) -> None:
     for r in range(1, layout.first_data_row):
         header_row_idx = r - 1
@@ -496,11 +500,17 @@ def _style_header_rows(
         hdr_fg = _resolve_hex(specs.header_fg, header_row_idx)
         skip_cols = layout.n_row_index_cols if r == layout.row_header_row else 0
         for c in range(skip_cols + 1, layout.n_row_index_cols + layout.n_data_cols + 1):
-            _apply_cell_colors(ws.cell(r, c), pattern_fill_cls, font_cls, hdr_bg, hdr_fg)
+            _apply_cell_colors(
+                ws.cell(r, c), pattern_fill_cls, font_cls, hdr_bg, hdr_fg
+            )
 
 
 def _style_row_header_cells(
-    ws: Any, specs: _StyleSpecs, layout: _ExcelLayout, pattern_fill_cls: Any, font_cls: Any
+    ws: Any,
+    specs: _StyleSpecs,
+    layout: _ExcelLayout,
+    pattern_fill_cls: Any,
+    font_cls: Any,
 ) -> None:
     # The row_header= text lives in the LAST header row's index columns —
     # either its own dedicated row (when pandas writes one) or merged into
@@ -519,7 +529,11 @@ def _style_row_header_cells(
 
 
 def _style_data_rows(
-    ws: Any, specs: _StyleSpecs, layout: _ExcelLayout, pattern_fill_cls: Any, font_cls: Any
+    ws: Any,
+    specs: _StyleSpecs,
+    layout: _ExcelLayout,
+    pattern_fill_cls: Any,
+    font_cls: Any,
 ) -> None:
     # Row index cells get row_bg/fg ONLY, data cells get cell_bg/fg ONLY —
     # neither falls back to the other.
@@ -533,9 +547,13 @@ def _style_data_rows(
         for c in range(1, layout.n_row_index_cols + layout.n_data_cols + 1):
             cell = ws.cell(xl_row, c)
             if c <= layout.n_row_index_cols:
-                _apply_cell_colors(cell, pattern_fill_cls, font_cls, cur_row_bg, cur_row_fg)
+                _apply_cell_colors(
+                    cell, pattern_fill_cls, font_cls, cur_row_bg, cur_row_fg
+                )
             else:
-                _apply_cell_colors(cell, pattern_fill_cls, font_cls, cur_cell_bg, cur_cell_fg)
+                _apply_cell_colors(
+                    cell, pattern_fill_cls, font_cls, cur_cell_bg, cur_cell_fg
+                )
 
 
 def _apply_col_number_formats(

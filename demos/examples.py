@@ -343,19 +343,6 @@ flextab(
 )
 
 # %%
-print("All nested, with subtotals\n")
-flextab(
-    data=df,
-    groupby=["education", "sex", "region"],
-    table="""
-    region * (total sex * (total education))
-    ,
-    count
-    """,
-    labels=labels,
-)
-
-# %%
 print("All stacked\n")
 flextab(
     data=df,

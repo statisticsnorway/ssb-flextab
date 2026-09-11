@@ -240,7 +240,7 @@ def _default_table_expr(measure: list[str], groupby: list[str]) -> str:
 
 
 def _split_dims(
-    dims: tuple[DimNode, ...],
+    dims: list[DimNode],
 ) -> tuple[DimNode | None, DimNode]:
     """Split the parsed TABLE expression into (row_dim, col_dim)."""
     if len(dims) == 1:
@@ -537,7 +537,6 @@ def _sort_keys(
     label_map: dict[str, dict[Any, str]],
 ) -> list[tuple[Any, Any]]:
     """Sort row/col keys, respecting sort_by='code', 'index', or 'label'."""
-    value_key_fn: Callable[[str | None, Any], tuple[int, int | str]] | None
     if sort_by == "index" and label_map:
         value_key_fn = partial(_index_value_key, label_map=label_map)
     elif sort_by == "label" and label_map:
@@ -814,10 +813,10 @@ def _make_index(
 
     labels = _drop_blank_levels(labels)
 
-    D_final = len(labels[0]) if labels else 0
-    if D_final == 0:
+    n_levels = len(labels[0]) if labels else 0
+    if n_levels == 0:
         return pd.Index([""] * len(keys))
-    if D_final == 1:
+    if n_levels == 1:
         return cast(pd.Index, pd.Index([t[0] for t in labels]))
     return pd.MultiIndex.from_tuples(labels)
 
@@ -1485,14 +1484,14 @@ def _fill_cells(
 
 
 if __name__ == "__main__":
-    np.random.seed(42)
+    generator = np.random.default_rng(42)
     n = 200
     demo = pd.DataFrame(
         {
-            "origin": np.random.choice(["Asia", "Europe", "USA"], n),
-            "type": np.random.choice(["Sedan", "SUV", "Truck"], n),
-            "msrp": np.random.normal(35000, 12000, n).clip(10000),
-            "horsepower": np.random.normal(220, 60, n).clip(80),
+            "origin": generator.choice(["Asia", "Europe", "USA"], n),
+            "type": generator.choice(["Sedan", "SUV", "Truck"], n),
+            "msrp": generator.normal(35000, 12000, n).clip(10000),
+            "horsepower": generator.normal(220, 60, n).clip(80),
         }
     )
 

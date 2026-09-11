@@ -324,7 +324,7 @@ class _Parser:
 
 def _is_format_decimal_comma(chars_so_far: str) -> bool:
     """Whether a comma at this position is the decimal separator in format=W,D."""
-    return bool(re.search(r"format\s*=\s*[0-9]+$", chars_so_far))
+    return bool(re.search(r"format\s*=\s*\d+$", chars_so_far))
 
 
 @dataclass

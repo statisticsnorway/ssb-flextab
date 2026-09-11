@@ -12,6 +12,7 @@ from ssb_flextab import flextab
 # ## Examples for index.html
 
 # %%
+import pandas as pd
 
 df = pd.DataFrame(
     {
@@ -50,7 +51,7 @@ flextab(
     employment
     ,
     education
-    """,
+    """
 )
 
 # %%
@@ -62,7 +63,7 @@ flextab(
     education
     ,
     employment
-    """,
+    """
 )
 
 # %% [markdown]
@@ -77,7 +78,7 @@ flextab(
     employment
     ,
     total education
-    """,
+    """
 )
 
 # %%
@@ -89,7 +90,7 @@ flextab(
     total employment
     ,
     education
-    """,
+    """
 )
 
 # %%
@@ -101,7 +102,7 @@ flextab(
     total employment
     ,
     total education
-    """,
+    """
 )
 
 # %% [markdown]
@@ -116,7 +117,7 @@ flextab(
     total employment
     ,
     count
-    """,
+    """
 )
 
 # %%
@@ -128,7 +129,7 @@ flextab(
     total employment
     ,
     count
-    """,
+    """
 )
 
 # %%
@@ -141,7 +142,7 @@ flextab(
     total education
     ,
     count
-    """,
+    """
 )
 
 # %%
@@ -153,7 +154,7 @@ flextab(
     education * (total employment)
     ,
     count
-    """,
+    """
 )
 
 # %% [markdown]
@@ -168,7 +169,7 @@ flextab(
     total employment
     ,
     total education
-    """,
+    """
 )
 
 # %%
@@ -180,7 +181,7 @@ flextab(
     total employment
     ,
     (total education) * colpctn
-    """,
+    """
 )
 
 # %%
@@ -192,7 +193,7 @@ flextab(
     total employment
     ,
     (total education) * rowpctn
-    """,
+    """
 )
 
 # %%
@@ -204,7 +205,7 @@ flextab(
     total employment
     ,
     (total education) * pctn
-    """,
+    """
 )
 
 # %% [markdown]
@@ -697,16 +698,29 @@ flextab(
     labels=labels,
 )
 
+# %%
+print("Mean, median and sum income by group column in the rows and in the columns")
+flextab(
+    data=df,
+    groupby=["education", "region"],
+    measure="income",
+    table="""
+    education
+    ,
+    region * income * (mean median sum)
+    """,
+    labels=labels,
+)
+
 # %% [markdown]
 # ## Examples from statistikk.html
 
 # %%
 df = pd.DataFrame(
-    {
-        "region": ["Oslo", "Vestland", "Trøndelag", "Nord-Norge"],
-        "count": [100, 120, 80, 100],
-        "income": [65, 60, 34, 41],
-        "tax": [22, 18, 10, 12],
+    {"region": ["Oslo", "Vestland", "Trøndelag", "Nord-Norge"],
+     "count": [100, 120, 80, 100],
+     "income": [65, 60, 34, 41],
+     "tax": [22, 18, 10 ,12]
     }
 )
 df = df.copy()
@@ -716,8 +730,12 @@ df["tax_total"] = df["tax"]
 # One row for each person
 df = df.loc[df.index.repeat(df["count"])].reset_index(drop=True).drop(columns="count")
 
-df["income"] = df.groupby("region")["income_total"].transform(distribute_value)
-df["tax"] = df.groupby("region")["tax_total"].transform(distribute_value)
+df["income"] = df.groupby("region")["income_total"].transform(
+    distribute_value
+)
+df["tax"] = df.groupby("region")["tax_total"].transform(
+    distribute_value
+)
 df = df.drop(columns=["income_total", "tax_total"])
 
 # %% [markdown]
@@ -921,20 +939,6 @@ flextab(
     total region
     ,
     income * (pctn pctsum)
-    """,
-    labels=labels,
-)
-
-# %%
-print("Mean, median and sum income by group column in the rows and in the columns")
-flextab(
-    data=df,
-    groupby=["education", "region"],
-    measure="income",
-    table="""
-    education
-    ,
-    region * income * (mean median sum)
     """,
     labels=labels,
 )

@@ -324,7 +324,7 @@ class _Parser:
 
 def _is_format_decimal_comma(chars_so_far: str) -> bool:
     """Whether a comma at this position is the decimal separator in format=W,D."""
-    return bool(re.search(r"format\s*=\s*\d+$", chars_so_far))
+    return bool(re.search(r"format\s*=\s*[0-9]+$", chars_so_far))
 
 
 @dataclass
@@ -485,6 +485,35 @@ def _classify_node(
     )
 
 
+def _default_label(label: str | None, default: str) -> str:
+    return label if label is not None else default
+
+
+def _classify_all_entry(node: DimNode) -> tuple[str | None, tuple[str, str, None]]:
+    """Build the (all_label, path_order entry) pair for an 'all' node."""
+    return node.label, ("all", _default_label(node.label, "TOTAL"), None)
+
+
+def _classify_group_entry(
+    node: DimNode, orig: str
+) -> tuple[tuple[str, str], tuple[str, str, str]]:
+    """Build the (group_keys entry, path_order entry) pair for a 'group' node."""
+    lbl = _default_label(node.label, orig)
+    return (orig, lbl), ("group", lbl, orig)
+
+
+def _classify_var_entry(node: DimNode, orig: str) -> tuple[str, tuple[str, str, None]]:
+    """Build the (var_label, path_order entry) pair for a 'var' node."""
+    lbl = _default_label(node.label, orig)
+    return lbl, ("var", lbl, None)
+
+
+def _classify_stat_entry(node: DimNode, orig: str) -> tuple[str, tuple[str, str, None]]:
+    """Build the (stat_label, path_order entry) pair for a 'stat' node."""
+    lbl = _default_label(node.label, orig)
+    return lbl, ("stat", lbl, None)
+
+
 def _classify_path_nodes(
     path: list[DimNode],
     measure_list: list[str],
@@ -520,25 +549,23 @@ def _classify_path_nodes(
         category, orig = _classify_node(node, groupby_map, measure_map)
         if category == "all":
             has_all = True
-            all_label = node.label
-            path_order.append(
-                ("all", node.label if node.label is not None else "TOTAL", None)
-            )
+            all_label, all_path_entry = _classify_all_entry(node)
+            path_order.append(all_path_entry)
         elif category == "group":
             assert orig is not None  # guaranteed by _classify_node for "group"
-            lbl = node.label if node.label is not None else orig
-            group_keys.append((orig, lbl))
-            path_order.append(("group", lbl, orig))
+            group_entry, group_path_entry = _classify_group_entry(node, orig)
+            group_keys.append(group_entry)
+            path_order.append(group_path_entry)
         elif category == "var":
             assert orig is not None  # guaranteed by _classify_node for "var"
             var = orig
-            var_label = node.label if node.label is not None else orig
-            path_order.append(("var", var_label, None))
+            var_label, var_path_entry = _classify_var_entry(node, orig)
+            path_order.append(var_path_entry)
         else:  # 'stat'
             assert orig is not None  # guaranteed by _classify_node for "stat"
             stat = orig
-            stat_label = node.label if node.label is not None else orig
-            path_order.append(("stat", stat_label, None))
+            stat_label, stat_path_entry = _classify_stat_entry(node, orig)
+            path_order.append(stat_path_entry)
 
     return group_keys, var, var_label, stat, stat_label, has_all, all_label, path_order
 

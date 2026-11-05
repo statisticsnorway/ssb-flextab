@@ -104,7 +104,7 @@ Stacked columns in the row dimension and introduction of measure columns with di
 flextab(
     data=df,
     groupby=["region", "sex", "age_group"],
-    measure="income",         
+    measure="income",
     table="""
     total region age_group
     ,

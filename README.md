@@ -48,7 +48,91 @@ pip install ssb-flextab
 
 ## Usage
 
-A [tutorial](docs/flextab_tutorial.md) is found in the in the `docs` folder.
+
+Import pandas and flextab.
+
+```python
+import pandas as pd
+from ssb_flextab import flextab
+```
+
+Demo dataframe.
+
+```python
+df = pd.DataFrame({
+    "sex":        ["1", "1", "2", "1", None, "2", "2", "1", "2", "2"],
+    "age_group":  ["2", "1", "2", "3", "1", "2", "2", "2", "3", None],
+    "region":     [None, "2", "1", "2", "2", "3", "3", "2", "2", "1"],
+    "education":  ["3", "2", "3", "1", "3", "3", "3", "1", "3", "2"],
+    "income":     [300, 100, 450, 200, 650, 750, None, 850, 400, 350],
+    "tax":        [100, 10, 200, 90, 340, 370, 30, None, 150, 150],
+    "weight":     [1.5, 3.2, 1.7, 2.2, 6.1, 4.2, 1.9, 4.8, None, 8.2],
+})
+```
+
+Two dimensions with totals at the/left.
+
+```python
+flextab(
+    data=df,
+    groupby=["region", "sex"],
+    table="""
+    total region
+    ,
+    total sex
+    """
+)
+```
+
+Nested columns in the row and column dimensions with sub-totals.
+
+```python
+flextab(
+    data=df,
+    groupby=["region", "sex", "age_group", "education"],
+    table="""
+    total region * (total age_group)
+    ,
+    total sex * (total education)
+    """
+)
+```
+
+Stacked columns in the row dimension and introduction of measure columns with different statsistics.
+
+```python
+flextab(
+    data=df,
+    groupby=["region", "sex", "age_group"],
+    measure="income",
+    table="""
+    total region age_group
+    ,
+    income * (count sum mean) * (total sex)
+    """
+)
+```
+
+Different percentages:
+- Percentage of grand total
+- Row percentages
+- Column percentages
+
+The cells in the table are formatted with one decimal and decimal comma.
+
+```python
+flextab(
+    data=df,
+    groupby=["region", "sex"],
+    table="""
+    total region
+    ,
+    (pctn rowpctn colpctn) *format=7,1 * (total sex)
+    """
+)
+```
+
+A comprehensive [tutorial](https://github.com/statisticsnorway/ssb-flextab/blob/main/docs/flextab_tutorial.md) is found in the `docs` folder at the Statistics Norway github pages.
 
 ## Contributing
 

@@ -4,6 +4,10 @@ With ``include_missing_in_groupby=False`` rows with a missing groupby value
 must be removed from the data before the table is built. They must therefore
 be absent from every part of the table, including totals, subtotals, and
 percentage denominators, and not only from the grouped cells.
+
+The tests use the shared ``df`` fixture from ``conftest.py``. In it, row 0
+has a missing ``region``, row 4 a missing ``sex``, and row 9 a missing
+``age_group``, and the measure columns also hold missing values.
 """
 
 from typing import Any
@@ -13,27 +17,6 @@ import pytest
 
 from ssb_flextab import FlextabResult
 from ssb_flextab import flextab
-
-
-@pytest.fixture
-def df() -> pd.DataFrame:
-    """Return a frame with missing values in several groupby columns.
-
-    Row 0 has a missing ``region`` and row 4 has a missing ``sex``. Row 9 has
-    a missing ``age_group``. The measure columns also hold missing values to
-    show that these are unrelated to the groupby selection.
-    """
-    return pd.DataFrame(
-        {
-            "sex": ["1", "1", "2", "1", None, "2", "2", "1", "2", "2"],
-            "age_group": ["2", "1", "2", "3", "1", "2", "2", "2", "3", None],
-            "region": [None, "2", "1", "2", "2", "3", "3", "2", "2", "1"],
-            "education": ["3", "2", "3", "1", "3", "3", "3", "1", "3", "2"],
-            "income": [300, 100, 450, 200, 650, 750, None, 850, 400, 350],
-            "tax": [100, 10, 200, 90, 340, 370, 30, None, 150, 150],
-            "weight": [1.5, 3.2, 1.7, 2.2, 6.1, 4.2, 1.9, 4.8, None, 8.2],
-        }
-    )
 
 
 def _run(

@@ -70,7 +70,7 @@ df = pd.DataFrame({
 })
 ```
 
-Two dimensions with totals at the/left.
+Two dimensions with totals at the top/left.
 
 ```python
 flextab(

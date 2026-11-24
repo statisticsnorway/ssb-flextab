@@ -208,7 +208,7 @@ flextab(
 )
 
 # %% [markdown]
-# ## Examples from bygge.html
+# ## Examples from build.html
 
 # %%
 df = pd.DataFrame(
@@ -699,7 +699,7 @@ flextab(
 )
 
 # %% [markdown]
-# ## Examples from statistikk.html
+# ## Examples from statistics.html
 
 # %%
 df = pd.DataFrame(

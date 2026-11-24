@@ -213,7 +213,7 @@ flextab(
 )
 
 # %% [markdown]
-# ## Independant totals
+# ## Independent totals
 # Now, let us introduce a measure column again and some calculations. The `total` in the columns is not connected to the income and calcualtions, hence only the number of observations will be counted for the total.
 
 # %%

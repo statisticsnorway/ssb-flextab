@@ -6,10 +6,12 @@ be absent from every part of the table, including totals, subtotals, and
 percentage denominators, and not only from the grouped cells.
 """
 
-import numpy as np
+from typing import Any
+
 import pandas as pd
 import pytest
 
+from ssb_flextab import FlextabResult
 from ssb_flextab import flextab
 
 
@@ -34,18 +36,38 @@ def df() -> pd.DataFrame:
     )
 
 
-def _cell(result: pd.DataFrame, row_value: str, column: int = 0) -> float:
-    """Return the value of the row whose last index level is ``row_value``."""
-    for position, key in enumerate(result.index):
-        last = key[-1] if isinstance(key, tuple) else key
-        if last == row_value:
-            return float(result.iloc[position, column])
-    msg = f"No row ending in {row_value!r} in {list(result.index)}"
-    raise AssertionError(msg)
+def _run(
+    data: pd.DataFrame,
+    table: str,
+    groupby: str | list[str] | None = "region",
+    include_missing: bool = False,
+) -> FlextabResult:
+    """Build a table for the ``income`` measure with the given settings."""
+    return flextab(
+        data=data,
+        groupby=groupby,
+        measure=["income"],
+        table=table,
+        include_missing_in_groupby=include_missing,
+    )
+
+
+def _by_key(result: FlextabResult) -> dict[Any, float]:
+    """Map every row key to the value in the first column."""
+    matrix = result.to_numpy(dtype=float)
+    return {key: float(matrix[pos, 0]) for pos, key in enumerate(result.index)}
+
+
+def _by_last_level(result: FlextabResult) -> dict[Any, float]:
+    """Map the last index level of every row to the value in the first column."""
+    return {
+        (key[-1] if isinstance(key, tuple) else key): value
+        for key, value in _by_key(result).items()
+    }
 
 
 def test_total_excludes_rows_with_missing_groupby(df: pd.DataFrame) -> None:
-    """The total must not count the row whose groupby value is missing."""
+    """Reproduce the reported case: the total is 9, not 10."""
     result = flextab(
         data=df,
         groupby="region",
@@ -58,144 +80,87 @@ def test_total_excludes_rows_with_missing_groupby(df: pd.DataFrame) -> None:
         include_missing_in_groupby=False,
     )
 
-    assert _cell(result, "TOTAL") == 9.0
-    assert df["region"].isna().sum() == 1
     assert len(df) == 10
+    assert _by_last_level(result)["TOTAL"] == 9.0
 
 
-def test_total_equals_sum_of_groups(df: pd.DataFrame) -> None:
-    """The total row is the sum of the group rows when nothing is missing."""
-    result = flextab(
-        data=df,
-        groupby="region",
-        measure=["income"],
-        table="(region total), size",
-        include_missing_in_groupby=False,
-    )
+@pytest.mark.parametrize(
+    ("table", "total", "groups"),
+    [
+        pytest.param("(region total), size", 9.0, [2.0, 5.0, 2.0], id="size"),
+        # Row 0 has income 300 and a missing region, so the total is 4050 - 300.
+        pytest.param(
+            "(region total), income*sum", 3750.0, [800.0, 2200.0, 750.0], id="sum"
+        ),
+        pytest.param(
+            "(region total), pctn",
+            100.0,
+            [200 / 9, 500 / 9, 200 / 9],
+            id="pctn",
+        ),
+    ],
+)
+def test_total_and_groups_exclude_dropped_row(
+    df: pd.DataFrame, table: str, total: float, groups: list[float]
+) -> None:
+    """Totals, group cells, and percentages are all based on the kept rows."""
+    values = _by_last_level(_run(df, table))
 
-    groups = sum(_cell(result, level) for level in ("1", "2", "3"))
-    assert _cell(result, "TOTAL") == groups == 9.0
+    assert values["TOTAL"] == pytest.approx(total)
+    assert [values[level] for level in ("1", "2", "3")] == pytest.approx(groups)
+    assert values["TOTAL"] == pytest.approx(sum(groups))
 
 
 def test_no_missing_level_is_created(df: pd.DataFrame) -> None:
     """No row for the missing level appears when it is excluded."""
-    result = flextab(
-        data=df,
-        groupby="region",
-        measure=["income"],
-        table="(region total), size",
-        include_missing_in_groupby=False,
-    )
+    result = _run(df, "(region total), size")
 
     last_levels = [key[-1] if isinstance(key, tuple) else key for key in result.index]
     assert "nan" not in last_levels
     assert last_levels.count("TOTAL") == 1
 
 
-def test_sum_total_excludes_measure_of_dropped_row(df: pd.DataFrame) -> None:
-    """The income of the dropped row must not end up in the total."""
-    result = flextab(
-        data=df,
-        groupby="region",
-        measure=["income"],
-        table="(region total), income*sum",
-        include_missing_in_groupby=False,
-    )
-
-    # Row 0 has income 300 and a missing region, so the total is 4050 - 300.
-    assert _cell(result, "TOTAL") == 3750.0
-    assert _cell(result, "TOTAL") == sum(_cell(result, v) for v in ("1", "2", "3"))
-
-
-def test_percentages_use_denominator_without_dropped_rows(df: pd.DataFrame) -> None:
-    """Percentages of the total must add up to 100 over the kept groups."""
-    result = flextab(
-        data=df,
-        groupby="region",
-        measure=["income"],
-        table="(region total), pctn",
-        include_missing_in_groupby=False,
-    )
-
-    assert _cell(result, "TOTAL") == pytest.approx(100.0)
-    parts = [_cell(result, v) for v in ("1", "2", "3")]
-    assert sum(parts) == pytest.approx(100.0)
-    assert parts == pytest.approx([200 / 9, 500 / 9, 200 / 9])
-
-
 def test_any_missing_groupby_column_excludes_the_row(df: pd.DataFrame) -> None:
-    """With several groupby columns, a missing value in any of them excludes the row.
+    """A missing value in any groupby column removes the row everywhere.
 
-    Row 0 (missing region) and row 4 (missing sex) are both removed, which
-    leaves 8 rows in the grand total.
+    Row 0 (missing region) and row 4 (missing sex) are both removed. That
+    leaves 8 rows in the grand total, and 3 rather than 4 rows in the
+    subtotal for sex 1, which equals its only region cell.
     """
-    result = flextab(
-        data=df,
-        groupby=["sex", "region"],
-        measure=["income"],
-        table="sex*(region total) total, size",
-        include_missing_in_groupby=False,
+    values = _by_key(
+        _run(
+            df,
+            "sex*(region total) total, size",
+            groupby=["sex", "region"],
+        )
     )
 
-    index = list(result.index)
-    grand_total = float(result.iloc[index.index(("", "", "", "TOTAL")), 0])
-    assert grand_total == 8.0
+    assert values[("", "", "", "TOTAL")] == 8.0
+    assert values[("sex", "1", "", "TOTAL")] == 3.0
+    assert values[("sex", "1", "region", "2")] == 3.0
 
 
-def test_subtotals_exclude_rows_with_missing_groupby(df: pd.DataFrame) -> None:
-    """The subtotal within sex 1 must not include the row with missing region."""
-    result = flextab(
-        data=df,
-        groupby=["sex", "region"],
-        measure=["income"],
-        table="sex*(region total) total, size",
-        include_missing_in_groupby=False,
-    )
+@pytest.mark.parametrize("include_missing", [True, None])
+def test_missing_rows_are_kept_by_default(
+    df: pd.DataFrame, include_missing: bool | None
+) -> None:
+    """The ``True`` setting and the default keep the missing level as a group."""
+    table = "(region total), size"
+    if include_missing is None:
+        result = flextab(data=df, groupby="region", measure=["income"], table=table)
+    else:
+        result = _run(df, table, include_missing=include_missing)
 
-    index = list(result.index)
-    sex1_subtotal = float(result.iloc[index.index(("sex", "1", "", "TOTAL")), 0])
-    sex1_regions = float(result.iloc[index.index(("sex", "1", "region", "2")), 0])
-    # Sex 1 has four rows, one of which has a missing region.
-    assert sex1_subtotal == sex1_regions == 3.0
-
-
-def test_include_missing_true_keeps_all_rows(df: pd.DataFrame) -> None:
-    """The default behaviour is unchanged: the missing level is kept as a group."""
-    result = flextab(
-        data=df,
-        groupby="region",
-        measure=["income"],
-        table="(region total), size",
-        include_missing_in_groupby=True,
-    )
-
-    assert _cell(result, "TOTAL") == 10.0
-    assert _cell(result, "nan") == 1.0
-
-
-def test_default_keeps_missing_rows(df: pd.DataFrame) -> None:
-    """Omitting the argument must behave like ``include_missing_in_groupby=True``."""
-    result = flextab(
-        data=df,
-        groupby="region",
-        measure=["income"],
-        table="(region total), size",
-    )
-
-    assert _cell(result, "TOTAL") == 10.0
+    values = _by_last_level(result)
+    assert values["TOTAL"] == 10.0
+    assert values["nan"] == 1.0
 
 
 def test_input_data_is_not_modified(df: pd.DataFrame) -> None:
     """The caller's frame must keep all its rows."""
     before = df.copy()
 
-    flextab(
-        data=df,
-        groupby="region",
-        measure=["income"],
-        table="(region total), size",
-        include_missing_in_groupby=False,
-    )
+    _run(df, "(region total), size")
 
     pd.testing.assert_frame_equal(df, before)
 
@@ -203,31 +168,23 @@ def test_input_data_is_not_modified(df: pd.DataFrame) -> None:
 def test_no_missing_values_gives_same_result_for_both_settings() -> None:
     """Without missing groupby values the setting makes no difference."""
     data = pd.DataFrame(
-        {"region": ["a", "a", "b", "c"], "income": [1.0, 2.0, 3.0, np.nan]}
+        {"region": ["a", "a", "b", "c"], "income": [1.0, 2.0, 3.0, float("nan")]}
     )
-    kwargs = {
-        "data": data,
-        "groupby": "region",
-        "measure": ["income"],
-        "table": "(region total), (n sum)*income",
-    }
+    table = "(region total), (n sum)*income"
 
-    kept = flextab(**kwargs, include_missing_in_groupby=True)
-    dropped = flextab(**kwargs, include_missing_in_groupby=False)
+    kept = _run(data, table, include_missing=True)
+    dropped = _run(data, table, include_missing=False)
 
+    assert list(kept.index) == list(dropped.index)
+    assert list(kept.columns) == list(dropped.columns)
     pd.testing.assert_frame_equal(
-        pd.DataFrame(kept.to_numpy(), index=kept.index, columns=kept.columns),
-        pd.DataFrame(dropped.to_numpy(), index=dropped.index, columns=dropped.columns),
+        pd.DataFrame(kept.to_numpy(dtype=float)),
+        pd.DataFrame(dropped.to_numpy(dtype=float)),
     )
 
 
 def test_table_without_groupby_is_unaffected(df: pd.DataFrame) -> None:
     """A table with no groupby column has nothing to exclude."""
-    result = flextab(
-        data=df,
-        measure=["income"],
-        table="size",
-        include_missing_in_groupby=False,
-    )
+    result = _run(df, "size", groupby=None)
 
-    assert float(result.iloc[0, 0]) == 10.0
+    assert result.to_numpy(dtype=float)[0, 0] == 10.0

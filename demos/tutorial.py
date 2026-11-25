@@ -40,18 +40,21 @@ pprint(df)
 pprint(labels)
 
 # %% [markdown]
+# ## Just groupby
 # With just defining a groupby column it will count the number of observations (N)
 
 # %%
 flextab(data=df, groupby="region")
 
 # %% [markdown]
+# ## Just measure
 # With just a measure column it will count the number of observations (N) and mean of the measure column
 
 # %%
 flextab(data=df, measure="income")
 
 # %% [markdown]
+# ## Both measure and groupby
 # When we add a measure column it will count the number of observations with values and the mean for the measure column and group it by the groupby column
 
 # %%
@@ -64,7 +67,8 @@ flextab(data=df, measure="income", groupby="region")
 flextab(data=df, measure="income", groupby=["region", "sex"])
 
 # %% [markdown]
-# So far the tables are made as default tables. Now, let us introduce the table argument. With it we define the table content and layout ourselves in a very flexible way. The table argument must be put within quotes. When column names are used in the table argument they shall **not** be within qoutes. Beware that when we use qoutes within the table argument it should use another quote (like double quotes for the argument and single quotes within the argument).
+# ## The table parameter
+# So far the tables are made as default tables. Now, let us introduce the table parameter. With it we define the table content and layout ourselves in a very flexible way. The table parameter must be put within quotes. When column names are used in the table parameter they shall **not** be within qoutes. Beware that when we use qoutes within the table parameter it should use another quote (like double quotes for the parameter and single quotes within the parameter).
 #
 # We start with a simple table in one dimension where make a distribution of the regions. The default count for groupby columns is the number of observations (n)
 
@@ -103,7 +107,8 @@ flextab(
 )
 
 # %% [markdown]
-# We can define two dimensions in the table argument, rows and columns, and they are separated by a comma. Here is a table where we put *region* in the rows and *sex* in the columns. The default count is the number of observations (N).
+# ## Two dimensions
+# We can define two dimensions in the table parameter, rows and columns, and they are separated by a comma. Here is a table where we put *region* in the rows and *sex* in the columns. The default count is the number of observations (N).
 
 # %%
 flextab(
@@ -117,6 +122,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Nested groupby in the rows
 # We can add a groupby column and nest it in to the region in the rows with an asterisk (*). For each value of region there will be a distribution of education
 
 # %%
@@ -131,6 +137,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Nested groupby in the rows and columns
 # We can add another groupby column and nest it in to the sex in the rows with an asterisk (*) as well
 
 # %%
@@ -145,6 +152,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Stacked groupby in the rows and columns
 # Instead of nesting columns we can stack them, we just remove the asterisk
 
 # %%
@@ -159,6 +167,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Totals
 # Now we introduce the `total`keyword for adding totals to our table.
 # We can also combine nesting and stacking. In the next example there will be stacked *sex* and *education* for each region
 
@@ -174,6 +183,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Totals and sub-totals
 # Now we can change to nested column in the rows, with totals. When `total` is nested to a group column, there will be made sub-totals.
 
 # %%
@@ -188,6 +198,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Totals grouped
 # By adding parenthesis around the `total` and *region* we cross the total with education as well. This means there will be distribution of education for the total as well as for each region.
 
 # %%
@@ -202,6 +213,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Independent totals
 # Now, let us introduce a measure column again and some calculations. The `total` in the columns is not connected to the income and calcualtions, hence only the number of observations will be counted for the total.
 
 # %%
@@ -217,6 +229,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Totals connected to measure column
 # When we put parenthesis around `total` and *region*, and connect it to *income* and calculations, we get all the statistics for the total as well.
 
 # %%
@@ -232,6 +245,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Different statistical calculations
 # Some of the calculations we can do on the measure columns is used below.
 
 # %%
@@ -262,9 +276,10 @@ flextab(
 )
 
 # %% [markdown]
-# We can calculate weighted figures by adding the `weight` argument. Beware that rows with missing values for the weight column will be excluded from all the calculations.
+# ## Weighted tables
+# We can calculate weighted figures by adding the `weight` parameter. Beware that rows with missing values for the weight column will be excluded from all the calculations.
 #
-# **NB!** The std, stderr and var is different from the sas results
+# **NB!** The std, stderr and var is different from the Sas results
 
 # %%
 flextab(
@@ -280,6 +295,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Percentages
 # We can calculate percentages of the number of observations or the sum of a measure column
 # - pctn
 # - pctsum
@@ -332,6 +348,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Percentage of count and sum
 # Beware that the percentage of the count (PCTN), will be different when we combine it
 # with a measure column and that column have missing values.
 # That is because the missing values are omitted for the count of measure column occurence.
@@ -364,6 +381,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Specify percentage denominator
 # Besides the default percentages we can decide the denominator ourselves by putting it within angle brackets. Here we want the regions two add up to 100 percent for the total and each value of sex.
 
 # %%
@@ -393,7 +411,8 @@ flextab(
 )
 
 # %% [markdown]
-# We can format the numbers in the table cells by adding formats within the table argument. First American with thousands separator.
+# ## Format numbers in the table cells
+# We can format the numbers in the table cells by adding formats within the table parameter. First American with thousands separator.
 
 # %%
 flextab(
@@ -423,7 +442,8 @@ flextab(
 )
 
 # %% [markdown]
-# we can change or omit label texts.
+# ## Row and column label texts
+# We can change or omit label texts.
 
 # %%
 flextab(
@@ -439,7 +459,8 @@ flextab(
 )
 
 # %% [markdown]
-# We can exclude missing values in groupby columns.
+# ## Exclude missing values for groupby columns
+# We can exclude missing values in groupby columns. The whole row with the missing values for the column with the missing value will be excluded.
 
 # %%
 flextab(
@@ -456,7 +477,8 @@ flextab(
 )
 
 # %% [markdown]
-# We use the `labels` argument to replace the codes with texts. These labels must exist in a nested dictionary. The default is to sort by the code.
+# ## Replace codes with texts
+# We use the `labels` parameter to replace the codes with texts. These labels must exist in a nested dictionary. The default is to sort by the code.
 
 # %%
 flextab(
@@ -473,8 +495,21 @@ flextab(
     sort_by="code",
 )
 
+# %%
+flextab(
+    data=df,
+    groupby=["education", "region"],
+    table="""
+    (total education='')
+    ,
+    (total region='')
+    """,
+    labels=labels,
+    sort_by="code",
+)
+
 # %% [markdown]
-# We use the `sort_by` argument to change the sorting order.
+# We use the `sort_by` parameter to change the sorting order.
 
 # %%
 flextab(
@@ -507,7 +542,8 @@ flextab(
 )
 
 # %% [markdown]
-# We can change the dot in the cells with no values
+# ## Specify character for empty cells
+# We can change the dot in the cells without values to another character
 
 # %%
 flextab(
@@ -526,6 +562,7 @@ flextab(
 )
 
 # %% [markdown]
+# ## Styling colours
 # There are also some styling options to add some colours to the table. These must be defined in dictionary which on ore more of these keys:
 # - **header_bg**   background colour for the column header rows
 # - **header_fg**   foreground (text) colour for column header rows
@@ -570,13 +607,14 @@ flextab(
 )
 
 # %% [markdown]
-# We can export the table to different formats, like excel or markdown.
+# ## Export table to Excel or Markdown
+# We can export the table to different formats, like Excel or markdown.
 #
 # Beware that output tables may contain sensitive data. Don't save output tables
 # to a github repository. In the examples below they are stored in the working directory.
 # Change the directory to a placement outside the repository before you export tables to external files.
 #
-# Here is an example on export to excel.
+# Here is an example on export to Excel.
 
 # %%
 tab = flextab(
@@ -634,6 +672,7 @@ with open(markdown_filename, "w", encoding="utf-8") as f:
     f.write(tab._repr_html_())
 
 # %% [markdown]
+# ## Several tables made in a loop
 # Loop to make table for each unique value for a column, but first a table for the total
 
 # %%

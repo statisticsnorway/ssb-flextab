@@ -225,6 +225,39 @@ def _normalize_measure_groupby(
     return measure or [], groupby or []
 
 
+def _drop_rows_with_missing_groupby(
+    data: pd.DataFrame,
+    groupby: list[str],
+) -> pd.DataFrame:
+    """Remove rows that have a missing value in any groupby column.
+
+    This is the equivalent of SAS PROC TABULATE excluding observations with
+    missing CLASS values when the ``MISSING`` option is not used. The
+    selection is made on the input data, before any cell is computed, so the
+    excluded rows are left out of every part of the table, including totals,
+    subtotals, and percentage denominators, and not only out of the grouped
+    cells.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Input data.
+    groupby : list[str]
+        Names of the groupby (CLASS) columns. A row is removed if any of
+        these columns holds a missing value (``None``, ``NaN``, ``pd.NA`` or
+        ``NaT``).
+
+    Returns
+    -------
+    pd.DataFrame
+        The rows of ``data`` without missing values in the groupby columns.
+        The input is returned unchanged when ``groupby`` is empty.
+    """
+    if not groupby:
+        return data
+    return data.dropna(subset=groupby)
+
+
 def _default_table_expr(measure: list[str], groupby: list[str]) -> str:
     """Build the default TABLE expression when none is supplied."""
     if measure:
@@ -1002,8 +1035,11 @@ def flextab(
         group level.
 
         If True, missing values are retained as grouping levels. If False,
-        rows with missing values in grouping columns are excluded from the
-        corresponding grouping operation.
+        every row with a missing value in any of the ``groupby`` columns is
+        removed from the data before the table is built (SAS: the default
+        behaviour without the ``MISSING`` option). The excluded rows
+        therefore do not contribute to anything in the table, including
+        totals (``ALL``/``TOTAL``), subtotals, and percentage denominators.
 
     fmt : str
         Default Python format string for numeric cells that do not have an
@@ -1144,6 +1180,11 @@ def flextab(
     """
     measure, groupby = _normalize_measure_groupby(measure, groupby)
     missing = include_missing_in_groupby
+    if not missing:
+        # Select before building the table: rows with a missing groupby value
+        # must not contribute to any cell, including totals and subtotals,
+        # which do not group by the missing column themselves.
+        data = _drop_rows_with_missing_groupby(data, groupby)
     # Flat lookup: original_value -> display_label for any groupby column.
     # Used by _fmt_val (via _make_index) to remap codes to labels, and by
     # _sort_keys for sort_by='index'/'label'.
